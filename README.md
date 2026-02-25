@@ -30,7 +30,7 @@
 
 ## Abstract
 
-TODO
+Modern vision models excel at recognition but fail to grasp geometric relationships like symmetry composition. This work investigates whether neural networks can internalize the algebraic structure of the dihedral group D₄ (square symmetries) rather than memorizing visual patterns. Using a Siamese encoder with autoregressive Transformer decoder, we train a model to predict whether two images are related by a D₄ transformation and identify the specific element. We demonstrate that the model learns true group properties: invariance to operation sequences (horizontal_flip → vertical_flip ≡ rotate_180), consistency with composition (g₂·g₁), canonical element representation, and correct rejection of unrelated pairs. Analysis of attention maps and embeddings reveals internal encoding of the D₄ multiplication table. Unlike VLMs that fail at such tasks, our architecture captures symbolic geometric structures.
 
 ## Citation
 
