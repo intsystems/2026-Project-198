@@ -44,7 +44,7 @@
 %%%
 
 
-\title{Title}
+\title{Analysis of the Group Structure of Square Symmetries in an Image Transformation Sequence Prediction Model}
 
 
 % The \author macro works with any number of authors. There are two commands
@@ -57,15 +57,15 @@
 
 
 \author{
-  Name Surname\\
-  MIPT\\
+  Denis Gudkov\\
+  Intelligent Systems\\
   Moscow, Russia\\
-  \texttt{email@phystech.edu}\\
-  \And
-  Name Surname\\
-  MIPT\\
-  Moscow, Russia\\
-  \texttt{email@phystech.edu}\\
+  \texttt{email@gmail.com}\\
+  % \And
+  % Name Surname\\
+  % MIPT\\
+  % Moscow, Russia\\
+  % \texttt{email@phystech.edu}\\
 }
 
 
@@ -75,14 +75,36 @@
 \maketitle
 
 \begin{abstract}
-    TODO
+  Modern vision models excel at recognition but fail to grasp geometric relationships like symmetry composition. This work investigates whether neural networks can internalize the algebraic 
+  structure of the dihedral group $D_4$ (square symmetries) rather than memorizing visual patterns. Using a Siamese encoder with autoregressive Transformer decoder, we train a model to predict 
+  whether two images are related by a $D_4$ transformation and identify the specific element. We demonstrate that the model learns true group properties: invariance to operation sequences 
+  ($\mathtt{horizontal\_flip} \to \mathtt{vertical\_flip} \equiv \mathtt{rotate\_180}$), canonical element representation, and correct rejection of unrelated pairs. Analysis of attention 
+  maps and embeddings reveals internal encoding of the  multiplication table. Unlike VLMs that fail at such tasks, our architecture captures symbolic geometric structures.
 \end{abstract}
 
 \textbf{Keywords:} TODO
 
 \section{Introduction}\label{sec:intro}
 
-TODO
+Deep learning has achieved remarkable success in visual recognition tasks~\cite{he2016deep, dosovitskiy2021image}. However, recent evaluations reveal that even state-of-the-art vision-language
+ models struggle with spatial reasoning: they fail to reliably judge relative positions, estimate distances, or identify geometric relationships between objects in a 
+ scene~\cite{chen2024spatialvlm, cheng2024spatialrgpt}. A particularly striking failure mode is compositional geometric reasoning --- for instance, recognizing that applying a horizontal flip
+  followed by a vertical flip is equivalent to a $180°$ rotation. This raises a fundamental question: can neural networks learn not just to recognize visual patterns, but to internalize the 
+  algebraic rules governing geometric symmetries?
+ 
+The symmetries of the square, formalized as the dihedral group $D_4$, provide a natural and tractable testbed for investigating this question. $D_4$ is a non-abelian group of order~8 comprising four rotations and four reflections, equipped with a well-defined multiplication table. Its structure is rich enough to exhibit non-trivial algebraic phenomena --- commutativity failure, subgroup hierarchy, and generator-relation constraints --- while remaining small enough for exhaustive analysis of model behavior. If a network can be shown to internalize the group operation of $D_4$, rather than memorizing a lookup table over visual exemplars, this constitutes evidence that neural architectures are capable of genuine symbolic geometric reasoning.
+ 
+In this work, we frame the problem as follows: given a pair of images $(I_1, I_2)$, the model must determine whether $I_2$ can be obtained from $I_1$ by applying some element $g \in D_4$, and if so, identify~$g$. This formulation goes beyond standard classification: the model must implicitly learn that composition of operations is well-defined ($g_1 \circ g_2 = g_3$ implies a unique~$g_3$), that every transformation has an inverse, and that visually distinct operation sequences may correspond to the same group element (canonical representation).
+ 
+Our architecture consists of a Siamese convolutional encoder~\cite{bromley1993signature} paired with an autoregressive Transformer decoder~\cite{vaswani2017attention}. The encoder produces embeddings for each image in the pair, and the decoder predicts the transformation element, conditioning on both representations. We evaluate the model on its ability to: (i)~correctly identify individual $D_4$ elements, (ii)~generalize across equivalent operation sequences, and (iii)~reject image pairs not related by any $D_4$ transformation.
+ 
+A central question in our experimental design is the role of geometric priors in the encoder. Standard convolutional networks possess translation equivariance but are not equivariant to the full $D_4$ group~\cite{cohen2016group}. Recent work on equivariant neural networks --- notably $E(2)$-equivariant steerable CNNs~\cite{weiler2019general} --- provides architectures whose feature maps transform predictably under rotations and reflections by construction. We compare standard encoders against $D_4$-equivariant encoders to investigate whether built-in symmetry constraints facilitate or hinder the learning of group structure. On the one hand, equivariant representations may provide the decoder with features that are naturally aligned with the algebraic task; on the other hand, a sufficiently expressive standard encoder may discover equivalent representations through training alone, and the inductive bias may prove redundant or even restrictive.
+ 
+Our analysis extends beyond accuracy metrics. By examining attention patterns in the Transformer decoder and the geometry of the learned embedding space, we provide evidence that the model constructs an internal representation isomorphic to the $D_4$ multiplication table. Specifically, we show that embeddings of transformed images cluster according to group-theoretic structure, and that attention heads specialize in resolving ambiguities between confusable elements (e.g., distinguishing $r_{90}$ from $r_{270}$, or $\sigma_h$ from $\sigma_v$). This line of analysis connects to recent work on mechanistic interpretability of networks trained on algebraic tasks, where transformers have been shown to discover structured representations such as Fourier features for modular arithmetic~\cite{power2022grokking, nanda2023progress}.
+ 
+This work contributes to the growing body of research at the intersection of group theory and deep learning~\cite{bronstein2021geometric}. While geometric deep learning has primarily focused on building equivariance \emph{into} architectures~\cite{cohen2016group, weiler2019general}, we ask the complementary question: to what extent can networks \emph{discover} group structure from data? Our results suggest that with appropriate architectural choices, neural networks can move beyond pattern matching toward a form of algebraic reasoning about spatial transformations.
+ 
+The remainder of the paper is organized as follows. Section~\ref{sec:related} reviews related work on geometric deep learning, equivariant architectures, and algebraic reasoning in neural networks. Section~\ref{sec:problem} formalizes the problem and describes the $D_4$ group structure. Section~\ref{sec:method} details the model architecture and training procedure, including the equivariant encoder ablation. Section~\ref{sec:experiments} presents experimental results, and Section~\ref{sec:interpretability} provides interpretability analysis of the learned representations. Section~\ref{sec:conclusion} concludes with a discussion of limitations and future directions.
 
 \textbf{Contributions.} Our contributions can be summarized as follows:
 \begin{itemize}
