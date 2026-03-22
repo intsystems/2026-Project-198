@@ -1,4 +1,4 @@
-\begin{thebibliography}{11}
+\begin{thebibliography}{9}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -24,16 +24,6 @@ Boyuan Chen, Zhuo Xu, Sean Kirmani, Brain Ichter, Dorsa Sadigh, Leonidas Guibas,
 An-Chieh Cheng, Hongxu Yin, Yang Fu, Qiushan Guo, Ruihan Yang, Jan Kautz, and Xiaolong Wang.
 \newblock {SpatialRGPT}: Grounded spatial reasoning in vision-language models.
 \newblock In \emph{Advances in Neural Information Processing Systems (NeurIPS)}, 2024.
-
-\bibitem[Bromley et~al.(1993)Bromley, Guyon, LeCun, S{\"a}ckinger, and Shah]{bromley1993signature}
-Jane Bromley, Isabelle Guyon, Yann LeCun, Eduard S{\"a}ckinger, and Roopak Shah.
-\newblock Signature verification using a ``{S}iamese'' time delay neural network.
-\newblock In \emph{Advances in Neural Information Processing Systems (NIPS)}, volume~6, 1993.
-
-\bibitem[Vaswani et~al.(2017)Vaswani, Shazeer, Parmar, Uszkoreit, Jones, Gomez, Kaiser, and Polosukhin]{vaswani2017attention}
-Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan~N. Gomez, {\L}ukasz Kaiser, and Illia Polosukhin.
-\newblock Attention is all you need.
-\newblock In \emph{Advances in Neural Information Processing Systems (NeurIPS)}, volume~30, 2017.
 
 \bibitem[Cohen and Welling(2016)]{cohen2016group}
 Taco~S. Cohen and Max Welling.

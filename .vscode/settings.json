@@ -1,0 +1,11 @@
+{
+  "python.defaultInterpreterPath": "/Users/den1shh/.pyenv/versions/3.12.12/bin/python3",
+  "python.analysis.autoSearchPaths": true,
+  "python.analysis.extraPaths": [
+    "/Users/den1shh/.pyenv/versions/3.12.12/lib/python3.12/site-packages"
+  ],
+  "python.analysis.typeCheckingMode": "basic",
+  "jupyter.notebookFileRoot": "${workspaceFolder}",
+  "python-envs.defaultEnvManager": "ms-python.python:pyenv",
+  "python-envs.pythonProjects": []
+}
