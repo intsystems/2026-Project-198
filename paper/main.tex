@@ -486,7 +486,26 @@ In addition to Table~\ref{tab:comparison} (§\,\ref{sec:intro}) and Table~\ref{t
 % Figure~6 (t-SNE), and 2--3 paragraphs of analysis.
 
 \section{Conclusion}\label{sec:concl}
-% Task 9: Conclusion placeholder
+We presented a siamese plagiarism detector that benchmarks five encoder configurations
+spanning three symmetry groups---$D_4$ (Octic ViT), $\mathbb{Z}^2$ (Shift-Equivariant ViT),
+and $SE(2)$ (Harmformer)---against a plain ViT-L/16 baseline.
+By fixing the DINOv2 pre-training protocol and varying only the geometric inductive bias and
+the presence of an $L^2$ contrastive regularizer, the framework isolates the contribution of
+built-in $G$-invariance from that of data augmentation across 10 runs.
+The theoretical foundation (\S\,\ref{sec:method}) establishes three guarantees:
+symmetry of the fusion module, isometry invariance of the $L^2$ contrastive loss,
+and full invariance propagation through the siamese pipeline.
+The central hypothesis---that $G$-invariant encoders trained without block G augmentations
+match or exceed a ViT-L/16 trained with full augmentation---remains subject to the
+experimental evaluation on DomainNet.
+
+The experimental runs (\S\,\ref{sec:results}) will be completed in subproject C:
+implementing Shift-Equivariant ViT and Harmformer, pre-training all five encoders on
+ImageNet-1K, and executing the 10 siamese fine-tuning experiments.
+Results will be reported as FPR and Recall stratified by transformation class on the
+balanced DomainNet test set.
+We anticipate that the equivariant encoders will validate the inductive bias hypothesis,
+reducing reliance on geometric augmentation while preserving detection performance.
 
 \bibliographystyle{unsrtnat}
 \bibliography{references}
