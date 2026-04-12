@@ -65,7 +65,7 @@ Harmformer~\cite{karella2024harmformer} & $SE(2)$ & Exact & Arbitrary angles + s
 \end{tabular}
 \end{table}
 
-The experiment comprises 10 runs (5 encoders $\times$ \{with, without\} $L^2$ regularizer) evaluated on a class-balanced subset of DomainNet spanning six visual domains. Primary metrics are FPR and Recall at a fixed decision threshold; secondary metric is F1. This design isolates the contribution of each inductive bias and directly tests whether exact geometric invariance reduces false positives relative to an augmentation-only baseline.
+The experiment comprises 10 runs (5 encoders $\times$ \{with, without\} $L^2$ regularizer) evaluated on a class-balanced subset of DomainNet spanning six visual domains. Primary metrics are FPR and Recall at a fixed decision threshold; secondary metric is F1. This design isolates the contribution of each inductive bias and directly tests whether exact geometric invariance reduces false positives relative to an augmentation-only baseline. Table~\ref{tab:comparison} summarises the methods compared.
 
 The remainder of this paper is organized as follows. Section~\ref{sec:rw} reviews related work on equivariant networks, siamese architectures, and plagiarism detection. Section~\ref{sec:problem} formalizes the detection task and evaluation protocol. Section~\ref{sec:prelim} develops the theoretical background on group equivariance. Section~\ref{sec:method} describes the siamese framework, encoder configurations, and the $L^2$ contrastive regularizer. Section~\ref{sec:exp} presents experimental results and ablations. Section~\ref{sec:concl} concludes with limitations and future directions.
 
@@ -81,7 +81,7 @@ Cohen and Welling~\cite{cohen2016group} introduced G-CNNs that encode discrete s
 Nordstr\"{o}m et al.~\cite{nordstrom2025octic} replaced standard ViT layers with $D_4$-equivariant variants, achieving a 40\% FLOPs reduction at accuracy comparable to the baseline ViT. Rojas-Gomez et al.~\cite{rojasgomez2024shift} achieve exact shift-equivariance via adaptive polyphase sampling---introducing A-token, A-WSA, A-PMerge, and A-RPE modules---without adding learnable parameters. Karella et al.~\cite{karella2024harmformer} combine circular harmonic filters with transformer blocks to obtain continuous SE(2)-equivariance, extending roto-translation symmetry to arbitrary angles. No prior work evaluates any of these architectures on pairwise image similarity or plagiarism detection, leaving open the question of whether geometric inductive bias reduces false positives.
 
 \paragraph{Self-supervised ViT pre-training and contrastive learning.}
-DINOv2 (Oquab et al., 2024)~\cite{oquab2024dinov2} produces strong, transferable visual features via self-supervised learning on large unlabeled image collections; we use it as a common pre-training recipe across all encoders to ensure that performance differences reflect architectural choices rather than pre-training data. Chopra et al.~\cite{chopra2005learning} proposed contrastive loss for discriminative metric learning, showing that minimising intra-class distance while maximising inter-class distance yields strong verification performance. Hadsell et al.~\cite{hadsell2006dimensionality} introduced the $L^2$ contrastive formulation we adopt, motivated by its isometry invariance: the loss depends only on Euclidean distances in embedding space, making it robust to rigid transformations of the latent representation.
+DINOv2~\cite{oquab2024dinov2} produces strong, transferable visual features via self-supervised learning on large unlabeled image collections; we use it as a common pre-training recipe across all encoders to ensure that performance differences reflect architectural choices rather than pre-training data. Chopra et al.~\cite{chopra2005learning} proposed contrastive loss for discriminative metric learning, showing that minimising intra-class distance while maximising inter-class distance yields strong verification performance. Hadsell et al.~\cite{hadsell2006dimensionality} introduced the $L^2$ contrastive formulation we adopt, motivated by its isometry invariance: the loss depends only on Euclidean distances in embedding space, making it robust to rigid transformations of the latent representation.
 
 \section{Problem Statement}\label{sec:problem}
 \paragraph{\textbf{1. General problem.}}
@@ -390,7 +390,7 @@ This guarantees that the model's plagiarism score is the same regardless of whic
 
 \subsection{Dataset and Pre-training}
 
-All encoders are pre-trained on ImageNet-1K \cite{dosovitskiy2021image} using the DINOv2 \cite{oquab2024dinov2} self-supervised recipe.
+All encoders are pre-trained on ImageNet-1K using the DINOv2~\cite{oquab2024dinov2} self-supervised recipe.
 Pre-training is performed separately for each encoder architecture where DINOv2-compatible weights exist; for architectures where pre-trained weights are not publicly available, we initialize from a standard ViT-L/16 DINOv2 checkpoint and adapt.
 
 We use DomainNet \cite{peng2019domainnet} as the evaluation benchmark.

@@ -1,0 +1,127 @@
+\documentclass[12pt,pdf,hyperref={unicode}]{beamer}
+
+\beamertemplatenavigationsymbolsempty
+\setbeamertemplate{footline}[page number]
+
+\usepackage[utf8]{inputenc}
+\usepackage{bm}
+\usepackage{multirow}
+\usepackage{ragged2e}
+\usepackage{indentfirst}
+\usepackage{multicol}
+\usepackage{subfig}
+\usepackage{amsmath,amssymb}
+\usepackage{enumerate}
+\usepackage{mathtools}
+\usepackage{comment}
+\usepackage[all]{xy}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows,calc}
+\usepackage{graphicx}
+
+\definecolor{darkgreen}{rgb}{0.0, 0.2, 0.13}
+\definecolor{darkcyan}{rgb}{0.0, 0.55, 0.55}
+\definecolor{rotcol}{rgb}{0.0, 0.0, 0.75}
+\definecolor{refcol}{rgb}{0.75, 0.0, 0.0}
+\definecolor{predcol}{rgb}{0.0, 0.5, 0.0}
+
+\newcommand{\Frot}[3]{%
+  \begin{scope}[shift={(#1,#2)}, rotate=#3]
+    \draw[thick, fill=blue!8] (-0.18,-0.24) rectangle (0.18,0.24);
+    \draw[very thick, darkgreen] (-0.12,-0.24) -- (-0.12,0.19);
+    \draw[very thick, darkgreen] (-0.12,0.19) -- (0.12,0.19);
+    \draw[very thick, darkgreen] (-0.12,0.0) -- (0.04,0.0);
+  \end{scope}
+}
+\newcommand{\Fref}[3]{%
+  \begin{scope}[shift={(#1,#2)}, rotate=#3, xscale=-1]
+    \draw[thick, fill=red!8] (-0.18,-0.24) rectangle (0.18,0.24);
+    \draw[very thick, refcol] (-0.12,-0.24) -- (-0.12,0.19);
+    \draw[very thick, refcol] (-0.12,0.19) -- (0.12,0.19);
+    \draw[very thick, refcol] (-0.12,0.0) -- (0.04,0.0);
+  \end{scope}
+}
+
+\title{Analysis of the Group Structure of Square Symmetries \\ in an Image Transformation }
+
+\begin{document}
+
+\setcounter{page}{2}
+
+%----------------------------------------------------------------------------------------------------------
+\begin{frame}[t]{Image Plagiarism Detection}
+\vspace{-5pt}
+\footnotesize
+\textit{Given a pair of images, predict whether one of them is derived from the other.}
+
+\vspace{1pt}
+\begin{columns}[T]
+
+\begin{column}{0.52\textwidth}
+\vspace{0pt}
+\centering
+\includegraphics[width=\linewidth]{image.png}
+\end{column}
+
+\begin{column}{0.50\textwidth}
+\begin{itemize}
+  \setlength{\itemsep}{1pt}
+  \item[$\blacktriangleright$] $D_4 = \{(r, s) \mid r^4\!=\!s^2\!=\!e,\; srs\!=\!r^{-1}\}$ --- dihedral group of the square, $|D_4|\!=\!8$
+  \item[$\blacktriangleright$] $f_{\bm{\theta}} \colon \mathcal{X} \to \mathbb{R}^d$ --- equivariant encoder
+  \item[$\blacktriangleright$] \textit{Equivariance:}\; $\phi(g \!\cdot\! \mathbf{x}) = \rho(g)\,\phi(\mathbf{x})$
+\end{itemize}
+
+\vspace{1pt}
+\end{column}
+
+\end{columns}
+
+\textbf{Solution:}\;
+\begin{itemize}
+  \item ~Siamese $D_4$-equivariant encoder
+  \item ~Contrastive loss:
+\end{itemize}
+\vspace{-2pt}
+{\footnotesize
+\setlength{\abovedisplayskip}{4pt}
+\setlength{\belowdisplayskip}{4pt}
+\begin{align*}
+\mathcal{L}_{\text{contr}}(\mathbf{I}_1,\mathbf{I}_2,\theta)
+  &\triangleq I[\ell_1 = \ell_2]\, D^2 + I[\ell_1 \neq \ell_2]\, \bigl(\max(0, m - D)\bigr)^2, \\
+  D &= \bigl\| \mathbf{f}_\theta(\mathbf{I}_1) - \mathbf{f}_\theta(\mathbf{I}_2) \bigr\|
+\end{align*}
+}
+% % === Prediction pipeline (full width) ===
+% \vspace{0pt}
+% \centering
+% \resizebox{0.95\textwidth}{!}{%
+% \begin{tikzpicture}[every node/.style={font=\small}]
+% \draw[thick, rounded corners, fill=gray!5] (-0.5,-1.0) rectangle (14.5,0.8);
+% \node[anchor=west] at (-0.3, 1.0) {\textbf{Prediction:}};
+
+% \Frot{0.2}{0}{0}
+% \node[below=4pt] at (0.2,-0.24) {$\mathbf{x}$};
+
+% \draw[->, thick] (0.55,0) -- (1.25,0);
+% \node[above=2pt] at (0.9,0.1) {$g$};
+
+% \Frot{1.7}{0}{180}
+% \node[below=4pt] at (1.7,-0.24) {$g\!\cdot\!\mathbf{x}$};
+
+% \draw[->, thick] (2.05,0) -- (2.8,0);
+
+% \node[draw, thick, fill=white, inner sep=3pt] at (4.0,0) {$f_{\bm{\theta}}(\mathbf{x},\, g\!\cdot\!\mathbf{x})$};
+
+% \draw[->, thick] (5.2,0) -- (5.9,0);
+
+% \node[predcol, font=\normalsize] at (6.8,0) {$\hat{g} \!\in\! D_4$};
+
+% \draw[thick, gray] (8.0,-0.5) -- (8.0,0.5);
+
+% \node at (11.3,0) {$f_{\bm{\theta}}(h\!\cdot\!\mathbf{x},\, h\!\cdot\!\mathbf{y}) = f_{\bm{\theta}}(\mathbf{x},\, \mathbf{y})\;\; \forall\, h \!\in\! D_4$};
+% \end{tikzpicture}%
+% }%
+
+\end{frame}
+
+\end{document}
