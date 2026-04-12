@@ -84,7 +84,113 @@ Nordstr\"{o}m et al.~\cite{nordstrom2025octicvisiontransformersquicker} replaced
 DINOv2 (Oquab et al., 2024)~\cite{oquab2024dinov2} produces strong, transferable visual features via self-supervised learning on large unlabeled image collections; we use it as a common pre-training recipe across all encoders to ensure that performance differences reflect architectural choices rather than pre-training data. Chopra et al.~\cite{chopra2005learning} proposed contrastive loss for discriminative metric learning, showing that minimising intra-class distance while maximising inter-class distance yields strong verification performance. Hadsell et al.~\cite{hadsell2006dimensionality} introduced the $L^2$ contrastive formulation we adopt, motivated by its isometry invariance: the loss depends only on Euclidean distances in embedding space, making it robust to rigid transformations of the latent representation.
 
 \section{Problem Statement}\label{sec:problem}
-% Task 5: Problem Statement placeholder
+\paragraph{\textbf{1. General problem.}}
+Given a pair of images $(x_1, x_2) \in \mathcal{X} \times \mathcal{X}$, the task is binary
+classification: predict $y \in \{0,1\}$ where $y=1$ indicates that $x_2$ is a plagiarised
+derivative of $x_1$. Plagiarism is operationalised as the composition of a geometric
+transformation $g \in G$ with a photometric perturbation $\pi \in G_{\mathrm{photo}}$
+(colour jitter, Gaussian blur, additive noise), yielding $x_2 = (g \circ \pi)(x_1)$.
+The detector must correctly identify such pairs regardless of which transformation was applied.
+
+\paragraph{\textbf{2. Sample set.}}
+The labelled dataset is
+\[
+  \mathcal{D} = \bigl\{(x_1^{(i)},\, x_2^{(i)},\, y^{(i)})\bigr\}_{i=1}^{N},
+\]
+where $y^{(i)} \in \{0,1\}$ and every image $x^{(i)} \in \mathcal{X} = [0,1]^{3 \times 224 \times 224}$.
+Each sample is a triple: a query image, a candidate image, and a binary plagiarism label.
+The dataset is balanced across positive and negative pairs and stratified by visual domain.
+
+\paragraph{\textbf{3. Statistical hypothesis.}}
+Positive pairs are drawn from the joint distribution
+\[
+  p_+(x_1, x_2) = \int p(x_1)\, p_T(x_2 \mid x_1)\, dx_1,
+\]
+where $p_T$ is a mixture over the transformation group $G \cup G_{\mathrm{photo}}$.
+Negative pairs are obtained by sampling $x_1$ and $x_2$ independently from the marginal $p(x)$,
+so $p_-(x_1, x_2) = p(x_1)\,p(x_2)$.
+The detector must distinguish the two regimes on held-out data.
+
+\paragraph{\textbf{4. Measurement conditions.}}
+All experiments use the DomainNet dataset~\cite{peng2019domainnet}, which spans six visually
+distinct domains: real photograph, painting, clipart, quickdraw, infograph, and sketch.
+Images are resized to $224 \times 224$ pixels in 8-bit RGB and normalised per-channel
+using ImageNet mean and standard deviation.
+This multi-domain structure enables evaluation of generalisation across severe appearance shifts.
+
+\paragraph{\textbf{5. Sample restrictions.}}
+Positive pairs consist of a source image $x$ and its transformed copy
+$(g \circ \pi)(x)$, where $g \sim \mathrm{Uniform}(G)$ and $\pi \sim p_{\mathrm{photo}}$.
+Negative pairs are constructed from two independently sampled images drawn from the
+\emph{same} DomainNet domain, making them hard negatives with shared visual statistics.
+The evaluation set contains 1200 pairs in total: 100 positives and 100 negatives for each
+of the six domains, ensuring balanced coverage.
+
+\paragraph{\textbf{6. Model.}}
+The full model is $f_\theta : \mathcal{X} \times \mathcal{X} \to [0,1]$, decomposed as
+\begin{equation}
+  f_\theta(x_1, x_2) = \sigma\!\bigl(h_\psi(\varphi_\theta(x_1),\, \varphi_\theta(x_2))\bigr),
+\end{equation}
+where $\varphi_\theta : \mathcal{X} \to \mathbb{R}^d$ is the encoder with shared weights,
+$h_\psi$ is the fusion module, and $\sigma$ denotes the sigmoid function.
+The siamese design ensures that both images are mapped to the same embedding space before comparison.
+
+\paragraph{\textbf{7. Class restrictions.}}
+The encoder $\varphi_\theta$ must be $G$-equivariant with a $G$-invariant pooling step so that
+the resulting embedding satisfies $\varphi_\theta(g \cdot x) = \varphi_\theta(x)$ for all $g \in G$.
+This invariance guarantees that geometric variants of the same image collapse to identical embeddings
+without data augmentation.
+Additionally, the fusion module $h_\psi$ must be symmetric:
+$h_\psi(z_1, z_2) = h_\psi(z_2, z_1)$, ensuring that the plagiarism score does not depend
+on the ordering of the two inputs.
+
+\paragraph{\textbf{8. Loss / criterion.}}
+Training minimises the composite objective
+\begin{equation}
+  \mathcal{L} = \mathcal{L}_{\mathrm{BCE}} + \lambda\,\mathcal{L}_{\mathrm{contr}}^{L^2},
+\end{equation}
+where $\mathcal{L}_{\mathrm{BCE}}$ is weighted binary cross-entropy with $w_+ = 0.3$ and $w_- = 0.7$,
+and the contrastive regulariser is
+\begin{equation}
+  \mathcal{L}_{\mathrm{contr}}^{L^2}(z_1, z_2, y)
+    = y\,\|z_1 - z_2\|_2^2
+      + (1 - y)\,\max\!\bigl(0,\, m - \|z_1 - z_2\|_2\bigr)^2.
+\end{equation}
+Setting $\lambda = 0$ recovers the variant trained without contrastive regularisation, which serves
+as a baseline to isolate the contribution of the geometric loss term.
+
+\paragraph{\textbf{9. Cross-validation procedure.}}
+Generalisation is estimated via stratified five-fold cross-validation over the DomainNet evaluation
+pool, with stratification by domain to ensure that every fold contains examples from all six domains.
+Hyper-parameters are selected on the validation fold, and test metrics are averaged across folds.
+This procedure is applied identically to all encoder configurations to ensure comparability.
+
+\paragraph{\textbf{10. Solution restrictions.}}
+All experiments are conducted on a single GPU with at most 48\,GB of VRAM, and fine-tuning is
+limited to at most 30 epochs.
+The encoder backbone $\varphi_\theta$ is frozen throughout training; only the fusion head $h_\psi$
+is updated.
+These constraints reflect a realistic resource budget and ensure that differences in performance
+reflect architectural choices rather than training cost.
+
+\paragraph{\textbf{11. External quality criteria.}}
+The primary metrics are \textbf{FPR} (false positive rate at the threshold that maximises F1 on the
+validation fold) and \textbf{Recall} reported per transformation class: colour jitter (CJ),
+Gaussian noise (GN), Gaussian blur (GS), rotation by $90^\circ$ (R90), $180^\circ$ (R180),
+$270^\circ$ (R270), watermark (WM), and combinations thereof.
+Secondary metrics are F1 score and t-SNE separability of embeddings $z$ on DomainNet.
+Stratified recall directly measures whether a given encoder is robust to specific transformation types.
+
+\paragraph{\textbf{12. Argmin.}}
+The optimal encoder and fusion parameters are given by
+\begin{equation}
+  \hat{\theta} = \arg\min_{\theta}\;
+    \mathbb{E}_{(x_1,\, x_2,\, y)\,\sim\,\mathcal{D}}\,
+    \mathcal{L}(\theta).
+\end{equation}
+In practice, this expectation is approximated by the empirical mean over mini-batches,
+and $\hat{\theta}$ is taken as the checkpoint with the lowest validation loss across the
+five cross-validation folds.
 
 \section{Preliminaries: Equivariance}\label{sec:prelim}
 % Task 6: Preliminaries placeholder
