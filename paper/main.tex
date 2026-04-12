@@ -194,7 +194,73 @@ and $\hat{\theta}$ is taken as the checkpoint with the lowest validation loss ac
 five cross-validation folds.
 
 \section{Preliminaries: Equivariance}\label{sec:prelim}
-% Task 6: Preliminaries placeholder
+
+\subsection{Group Actions and Representations}
+
+\begin{definition}[Group action]
+A \emph{left action} of a group $G$ on a set $\mathcal{X}$ is a map
+$G \times \mathcal{X} \to \mathcal{X}$,
+$(g, x) \mapsto g \cdot x$,
+satisfying $e \cdot x = x$ and $(gh) \cdot x = g \cdot (h \cdot x)$
+for all $g, h \in G$, $x \in \mathcal{X}$.
+\end{definition}
+
+\begin{definition}[Group representation]
+A \emph{(linear) representation} of $G$ on a vector space $V$ is a group homomorphism
+$\rho \colon G \to \mathrm{GL}(V)$.
+\end{definition}
+
+Representations describe concretely how $G$ acts on feature spaces: given a representation $\rho$, each group element $g$ is assigned an invertible linear transformation $\rho(g)$ of $V$, and the group multiplication is preserved by $\rho(gh) = \rho(g)\rho(h)$.
+
+\subsection{Equivariance and Invariance}
+
+\begin{definition}[$G$-Equivariance]
+A map $\varphi \colon \mathcal{X} \to \mathcal{Y}$ is \emph{$G$-equivariant} with respect to
+representations $\rho_\mathcal{X}$ on $\mathcal{X}$ and $\rho_\mathcal{Y}$ on $\mathcal{Y}$ if
+\[
+  \varphi\bigl(\rho_\mathcal{X}(g) \cdot x\bigr) = \rho_\mathcal{Y}(g) \cdot \varphi(x)
+  \quad \forall\, g \in G,\; x \in \mathcal{X}.
+\]
+\end{definition}
+
+\begin{definition}[$G$-Invariance]
+$\varphi$ is \emph{$G$-invariant} if $\rho_\mathcal{Y}$ is the trivial representation:
+$\varphi(\rho_\mathcal{X}(g) \cdot x) = \varphi(x)$ for all $g \in G$.
+\end{definition}
+
+Invariance is therefore a special case of equivariance in which the output space carries only the trivial action of $G$.
+For plagiarism detection, a $G$-invariant encoder $\varphi_\theta$ guarantees $\varphi_\theta(g \cdot x) = \varphi_\theta(x)$ for every $g \in G$, so embeddings are identical regardless of which group element was applied to the source image.
+This eliminates the need for group-specific augmentation at training time and provides an exact invariance guarantee at inference time.
+
+\subsection{Irreducible Representations and Schur's Lemma}
+
+\begin{lemma}[Schur]
+Let $\rho_1 \colon G \to \mathrm{GL}(V_1)$ and $\rho_2 \colon G \to \mathrm{GL}(V_2)$ be
+irreducible representations of a group $G$.
+Any $G$-equivariant linear map $\phi \colon V_1 \to V_2$ is either the zero map or
+an isomorphism.
+\end{lemma}
+
+As a consequence of Schur's lemma, $G$-equivariant linear maps between fully decomposed representations are block-diagonal with respect to the irreducible decomposition: each block acts within one irreducible component and cannot mix distinct irreducible types.
+This constraint significantly reduces the parameter space of equivariant layers compared to unconstrained linear maps.
+It directly motivates the architecture of Octic ViT~\cite{nordstrom2025octicvisiontransformersquicker}, where each transformer layer operates independently on each irreducible component of $D_4$, enforcing the block-diagonal structure by construction.
+
+\subsection{Symmetry Groups in This Work}
+
+\paragraph{The dihedral group $D_4$.}
+$D_4 = \langle r, s \mid r^4 = s^2 = e,\; srs = r^{-1} \rangle$ is the symmetry group of the square, of order~8.
+It acts on images by rotating and reflecting the spatial axes by multiples of $90^\circ$.
+$D_4$ has five irreducible representations over $\mathbb{R}$: four one-dimensional ($A_1, A_2, B_1, B_2$) and one two-dimensional ($E$); any $D_4$-representation decomposes as $V \cong \bigoplus_i n_i V_i$ over these five types.
+
+\paragraph{The discrete translation group $\mathbb{Z}^2$.}
+The group $(\mathbb{Z}^2, +)$ acts on an $H \times W$ image by cyclic pixel shifts:
+$(t_{a,b} \cdot x)[i, j, c] = x[(i + a) \bmod H,\; (j + b) \bmod W,\; c]$.
+It is relevant when plagiarists crop and re-centre images.
+Unlike $D_4$, $\mathbb{Z}^2$ is infinite (or large-but-finite on discrete images), making exact equivariance more challenging to enforce in the ViT patch-based setting.
+
+\paragraph{The special Euclidean group $SE(2)$.}
+$SE(2) = SO(2) \ltimes \mathbb{R}^2$ is the group of rigid motions of the plane: an element $(R_\alpha, t)$ rotates spatial coordinates by angle $\alpha$ and translates by $t \in \mathbb{R}^2$.
+Unlike $D_4$, which is restricted to multiples of $90^\circ$, $SE(2)$ covers arbitrary rotation angles, making it more general but also harder to implement exactly in discrete image processing.
 
 \section{Method}\label{sec:method}
 % Task 7: Method placeholder
