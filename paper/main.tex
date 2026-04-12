@@ -104,9 +104,10 @@ The dataset is balanced across positive and negative pairs and stratified by vis
 \paragraph{\textbf{3. Statistical hypothesis.}}
 Positive pairs are drawn from the joint distribution
 \[
-  p_+(x_1, x_2) = \int p(x_1)\, p_T(x_2 \mid x_1)\, dx_1,
+  p_+(x_1, x_2) = p(x_1)\, p_T(x_2 \mid x_1),
 \]
-where $p_T$ is a mixture over the transformation group $G \cup G_{\mathrm{photo}}$.
+where $p_T(x_2 \mid x_1) = \int_{G \times G_{\mathrm{photo}}} \delta(x_2 - (g \circ \pi)(x_1))\, d\mu(g, \pi)$
+is the mixture of transformation kernels over $G \cup G_{\mathrm{photo}}$.
 Negative pairs are obtained by sampling $x_1$ and $x_2$ independently from the marginal $p(x)$,
 so $p_-(x_1, x_2) = p(x_1)\,p(x_2)$.
 The detector must distinguish the two regimes on held-out data.
