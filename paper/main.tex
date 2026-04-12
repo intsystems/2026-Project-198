@@ -38,7 +38,36 @@ Detecting plagiarized images requires robustness to rotations, reflections, and 
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
-% Task 3: Introduction placeholder
+
+Image plagiarism detection asks whether two images $x$ and $x'$ depict the same underlying content despite geometric or photometric transformations applied to one of them. The central research question of this paper is: \emph{does building geometric symmetry directly into the encoder architecture improve plagiarism detection over relying on data augmentation alone?} We study this question systematically by comparing five encoder configurations across three symmetry groups---$D_4$, $\mathbb{Z}^2$, and $SE(2)$---within a single siamese framework, evaluating each with and without an $L^2$ contrastive regularizer on a balanced cross-domain benchmark.
+
+The object of study is pairs of natural images related by transformations drawn from $D_4$ (rotations by multiples of $90^\circ$ and reflections), $\mathbb{Z}^2$ (integer pixel shifts), or $SE(2)$ (arbitrary rotations and translations), compounded with photometric perturbations such as brightness jitter, contrast scaling, and JPEG compression. Standard Vision Transformers (ViTs)~\cite{dosovitskiy2021image} lack geometric invariance by construction: their patch-embedding tokenization is not equivariant to rotations or reflections, and their self-attention mechanism treats spatial position through learned positional encodings that generalize poorly outside the training distribution. Practitioners therefore rely on geometric data augmentation to approximate robustness at inference time; however, augmentation only stochastically covers the orbit of a transformation group, inflates training cost, and provides no invariance guarantee on unseen perturbations. Moreover, scaling model size does not resolve the underlying limitation---recent evidence shows that spatial and geometric reasoning fails to improve with scale alone~\cite{chen2024spatialvlm}. Consequently, there is a principled motivation to embed the desired symmetry as an inductive bias in the architecture itself, following the program of geometric deep learning~\cite{bronstein2021geometric,cohen2016group}.
+
+Formally, an encoder $\varphi_\theta : \mathcal{X} \to \mathcal{Z}$ is \emph{$G$-equivariant} if $\varphi_\theta(g \cdot x) = \rho(g)\,\varphi_\theta(x)$ for all $g \in G$ and all images $x$, where $\rho$ is a representation of $G$ on the embedding space $\mathcal{Z}$; it is \emph{$G$-invariant} when $\rho$ is the trivial representation, i.e.\ $\varphi_\theta(g \cdot x) = \varphi_\theta(x)$. In plagiarism detection the siamese head compares embeddings $z = \varphi_\theta(x)$ and $z' = \varphi_\theta(x')$, so invariance of $\varphi_\theta$ directly implies that geometric variants of the same image collapse to the same embedding without any augmentation. Full theoretical treatment of these properties is deferred to Section~\ref{sec:prelim}.
+
+Recent work has addressed geometric robustness in vision transformers from several directions. Nordstr\"{o}m et al.~\cite{nordstrom2025octicvisiontransformersquicker} introduce the Octic ViT, which enforces exact $D_4$-equivariance through group-structured weight sharing and reduces FLOPs by 40\% relative to a standard ViT of equal expressivity. Rojas-Gomez et al.~\cite{rojasgomez2023makingvisiontransformerstruly} design a Shift-Equivariant ViT that achieves exact $\mathbb{Z}^2$-invariance via anti-aliased downsampling and circular padding, but without rotational equivariance. Karella et al.~\cite{karella2024harmformerharmonicnetworksmeet} propose Harmformer, which lifts transformers to the continuous group $SE(2)$ using harmonic feature maps, providing equivariance to arbitrary in-plane rotations and translations at the cost of higher compute. On the side of learned features and plagiarism-specific architectures, Oquab et al.~\cite{oquab2024dinov2} demonstrate that DINOv2 pre-training on large unlabeled image sets produces highly transferable representations, and Dorin et al.~\cite{dorin2024pairwise} establish a siamese ViT baseline for pairwise plagiarism detection with false positive rate (FPR) as the primary evaluation metric~\cite{bromley1993signature}.
+
+We propose a siamese plagiarism detector with $G$-equivariant ViT encoders, providing exact invariance under $D_4$, $\mathbb{Z}^2$, or $SE(2)$ without geometric augmentation. The novelty relative to Dorin et al.~\cite{dorin2024pairwise} is twofold: (i) an $L^2$ contrastive regularizer that directly penalizes the Euclidean distance between embeddings of genuine pairs while separating impostor pairs, and (ii) a controlled ablation comparing geometric augmentation against equivariant inductive bias across three symmetry groups in one unified framework. Concretely, we execute five encoder configurations---standard ViT with augmentation, DINOv2-pretrained ViT, Octic ViT ($D_4$), Shift-Equivariant ViT ($\mathbb{Z}^2$), and Harmformer ($SE(2)$)---all initialized with DINOv2 weights on ImageNet-1K where architecturally compatible, and each trained in two conditions: with and without the $L^2$ contrastive regularizer.
+
+\begin{table}[t]
+\centering
+\caption{Comparison of approaches to geometric robustness in image matching.}
+\label{tab:comparison}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Method & Group & Exactness & Strengths & Weaknesses \\
+\midrule
+Dorin et al.~\cite{dorin2024pairwise} & None & Approximate & Flexible; strong features & No invariance guarantee \\
+Octic ViT~\cite{nordstrom2025octicvisiontransformersquicker} & $D_4$ & Exact & 40\% FLOPs reduction & Discrete; $90^\circ$ only \\
+Shift-Eq.\ ViT~\cite{rojasgomez2023makingvisiontransformerstruly} & $\mathbb{Z}^2$ & Exact & Exact shift invariance & No rotation equivariance \\
+Harmformer~\cite{karella2024harmformerharmonicnetworksmeet} & $SE(2)$ & Exact & Arbitrary angles + shifts & Higher compute cost \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The experiment comprises 10 runs (5 encoders $\times$ \{with, without\} $L^2$ regularizer) evaluated on a class-balanced subset of DomainNet spanning six visual domains. Primary metrics are FPR and Recall at a fixed decision threshold; secondary metric is F1. This design isolates the contribution of each inductive bias and directly tests whether exact geometric invariance reduces false positives relative to an augmentation-only baseline.
+
+The remainder of this paper is organized as follows. Section~\ref{sec:rw} reviews related work on equivariant networks, siamese architectures, and plagiarism detection. Section~\ref{sec:problem} formalizes the detection task and evaluation protocol. Section~\ref{sec:prelim} develops the theoretical background on group equivariance. Section~\ref{sec:method} describes the siamese framework, encoder configurations, and the $L^2$ contrastive regularizer. Section~\ref{sec:exp} presents experimental results and ablations. Section~\ref{sec:concl} concludes with limitations and future directions.
 
 \section{Related Work}\label{sec:rw}
 % Task 4: Related Work placeholder
