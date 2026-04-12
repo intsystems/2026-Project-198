@@ -387,7 +387,103 @@ Since $h_\psi$ and $\sigma$ are deterministic functions of their inputs, the out
 This guarantees that the model's plagiarism score is the same regardless of which $g \in G$ is applied to the input pair, matching the invariance required for geometric plagiarism detection.
 
 \section{Experiments}\label{sec:exp}
-% Task 8: Experiments placeholder
+
+\subsection{Dataset and Pre-training}
+
+All encoders are pre-trained on ImageNet-1K \cite{dosovitskiy2021image} using the DINOv2 \cite{oquab2024dinov2} self-supervised recipe.
+Pre-training is performed separately for each encoder architecture where DINOv2-compatible weights exist; for architectures where pre-trained weights are not publicly available, we initialize from a standard ViT-L/16 DINOv2 checkpoint and adapt.
+
+We use DomainNet \cite{peng2019domainnet} as the evaluation benchmark.
+DomainNet contains images from six visually diverse domains: real photograph, painting, clipart, quickdraw, infograph, and sketch.
+We construct a balanced test set of 1200 pairs: 100 positive pairs and 100 negative pairs for each of the six domains (600 positives and 600 negatives in total).
+Each image is resized to $224 \times 224$ pixels, yielding a feature count of $3 \times 224 \times 224 = 150{,}528$ scalar features per image.
+Positive pairs consist of a source image and a transformed copy; negative pairs consist of two distinct images from the same domain (hard negatives).
+
+\subsection{Training Pipeline}
+
+The experiment comprises 10 training runs: 5 encoders $\times$ \{$\lambda = 0$ (without $L^2$ regulariser), $\lambda > 0$ (with $L^2$ regulariser)\}.
+
+For each run, we load base images from a training split and construct pairs via the cross-batch strategy of Dorin et al.\ \cite{dorin2024pairwise}: a batch of $B$ images is augmented to form two views per image (block P for all encoders, additionally block G for ViT-L/16 augmented), and all $B^2$ pairwise combinations are formed with labels $y_{ij} = \mathbb{1}[i = j]$.
+Embeddings are computed through the frozen encoder and fusion module, the composite loss $\mathcal{L}$ is evaluated, and AdamW updates the fusion parameters $\psi$.
+All hyperparameters are listed in Table~\ref{tab:hyperparams}.
+
+\begin{table}[h]
+\centering
+\caption{Training hyperparameters.}
+\label{tab:hyperparams}
+\begin{tabular}{ll}
+\toprule
+Parameter & Value \\
+\midrule
+Optimizer & AdamW \\
+Learning rate & $10^{-3}$ \\
+Weight decay & $10^{-2}$ \\
+LR scheduler & MultiStepLR, milestones $[5,10]$, $\gamma=0.5$ \\
+BCE weights & $w_+=0.3$, $w_-=0.7$ \\
+Epochs & 15 \\
+Contrastive margin $m$ & 1.0 \\
+Contrastive weight $\lambda$ (when enabled) & 0.1 \\
+Batch size $B$ & 32 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Evaluation Protocol}
+
+The evaluation workflow for each (encoder, $\pm L^2$) run is: train on the training split, select a decision threshold on the validation fold to maximise F1, then compute final metrics on the held-out test set.
+
+The primary metrics are false positive rate (FPR) and Recall, both stratified by transformation class: ColorJitter (CJ), Gaussian Noise (GN), Grayscale (GS), R90, R180, R270, Watermark (WM), and their pairwise combinations.
+FPR is reported for direct comparability with Dorin et al.\ \cite{dorin2024pairwise}.
+Secondary metrics include the F1 score and a t-SNE visualisation of encoder embeddings computed on the full DomainNet evaluation set, with the six domains rendered as distinct point colours.
+
+\subsection{Code Organisation}
+
+The implementation targets the following modular structure, with all hyperparameters centralised in a single configuration file:
+
+\begin{itemize}
+  \item \texttt{code/main.py} --- single entry point for training and evaluation
+  \item \texttt{code/encoders/} --- encoder wrappers (ViT-L/16, Octic ViT, Shift-Equivariant ViT, Harmformer)
+  \item \texttt{code/siamese/} --- siamese network and fusion module
+  \item \texttt{code/data/} --- dataset loading and augmentation blocks P and G
+  \item \texttt{code/train/} --- training loop and loss computation
+  \item \texttt{code/eval/} --- evaluation, threshold selection, metric computation, t-SNE
+  \item \texttt{code/config.yaml} --- centralised hyperparameters (all values from Table~\ref{tab:hyperparams})
+\end{itemize}
+
+The current baseline is implemented in \texttt{code/image-plagiarism-detection-with-eq-encoders.ipynb}, which serves as the reference for hyperparameters and the cross-batch pairing strategy.
+
+\subsection{Planned Figures and Tables}
+
+All figures are to be produced in \texttt{.pdf} or \texttt{.eps} format at 300\,DPI, with fonts at 12--16\,pt and lines at 2\,pt width.
+
+\begin{itemize}
+  \item \textbf{Figure~1.} Siamese architecture schema: encoder branches, fusion module, sigmoid head.
+        (Axes: not applicable.)
+  \item \textbf{Figure~2.} Diagrams of $D_4$, $\mathbb{Z}^2$, $SE(2)$ with example actions on a sample image.
+        (Axes: spatial coordinates of the image under each transformation.)
+  \item \textbf{Figure~3} (source data plot). Distribution of DomainNet evaluation pairs.
+        $x$-axis: domain name; $y$-axis: pair count.
+  \item \textbf{Figure~4} (main message). FPR by encoder and regularisation condition.
+        $x$-axis: encoder name; $y$-axis: FPR; grouped bars: $\lambda=0$ vs.\ $\lambda>0$.
+  \item \textbf{Figure~5} (main message). Recall stratified by transformation class.
+        $x$-axis: transformation class (CJ, GN, GS, R90, R180, R270, WM, combos);
+        $y$-axis: Recall; bars grouped by encoder.
+  \item \textbf{Figure~6.} t-SNE of encoder embeddings on DomainNet.
+        Five subplots (one per encoder); point colours: six DomainNet domains.
+\end{itemize}
+
+In addition to Table~\ref{tab:comparison} (§\,\ref{sec:intro}) and Table~\ref{tab:hyperparams} (§\,\ref{sec:exp}):
+\begin{itemize}
+  \item \textbf{Table~3.} Main results: FPR for each (encoder, regularisation) run.
+  \item \textbf{Table~4.} Recall stratified by transformation class for each (encoder, regularisation) run.
+\end{itemize}
+
+\subsection{Results}\label{sec:results}
+
+% TODO: Fill after experimental runs (subproject~C).
+% Planned content: Table~3 (FPR), Table~4 (Recall by transformation),
+% Figure~4 (FPR grouped bars), Figure~5 (Recall grouped bars),
+% Figure~6 (t-SNE), and 2--3 paragraphs of analysis.
 
 \section{Conclusion}\label{sec:concl}
 % Task 9: Conclusion placeholder
