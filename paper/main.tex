@@ -263,7 +263,128 @@ $SE(2) = SO(2) \ltimes \mathbb{R}^2$ is the group of rigid motions of the plane:
 Unlike $D_4$, which is restricted to multiples of $90^\circ$, $SE(2)$ covers arbitrary rotation angles, making it more general but also harder to implement exactly in discrete image processing.
 
 \section{Method}\label{sec:method}
-% Task 7: Method placeholder
+
+\subsection{Siamese Framework}
+
+The detector follows the siamese architecture introduced by Bromley et al.~\cite{bromley1993signature} for signature verification. Two branches share an identical encoder $\varphi_\theta$, processing the query image $x_1$ and the candidate image $x_2$ in parallel to produce embeddings $z_1 = \varphi_\theta(x_1)$ and $z_2 = \varphi_\theta(x_2)$. A fusion module $h_\psi$ then combines the two embeddings into a scalar score, which is passed through a sigmoid to yield the final plagiarism probability. The full model (already introduced in \S\ref{sec:problem}) is
+\begin{equation}
+  f_\theta(x_1, x_2) = \sigma\!\bigl(h_\psi(\varphi_\theta(x_1),\, \varphi_\theta(x_2))\bigr).
+\end{equation}
+Weight sharing between the two branches guarantees that $x_1$ and $x_2$ are mapped to the same feature space, which is a prerequisite for any meaningful pairwise comparison: without shared weights the two embeddings live in unrelated spaces and the fusion module would be comparing incommensurable vectors.
+
+\subsection{Encoders}
+
+\paragraph{ViT-L/16 (augmented).}
+The baseline encoder is a standard ViT-L/16~\cite{dosovitskiy2021image}. Each $224 \times 224$ input is divided into $14 \times 14 = 196$ non-overlapping $16 \times 16$ patches; each patch is linearly projected to $\mathbb{R}^{1024}$ and the resulting sequence, together with a prepended \texttt{[CLS]} token, is processed by 24 transformer blocks with multi-head self-attention. The \texttt{[CLS]} token after the final layer norm serves as the image embedding $z \in \mathbb{R}^{1024}$. This encoder carries no equivariance guarantee. During training it receives both photometric augmentations (block P) and geometric augmentations (block G), as described in \S\ref{sec:aug}.
+
+\paragraph{ViT-L/16 (baseline).}
+Architecturally identical to ViT-L/16 (augmented), but trained with block P augmentations only; block G geometric transforms are withheld. This configuration serves as the key ablation: if this encoder matches the performance of equivariant encoders, then geometric augmentation alone suffices and architectural inductive bias adds nothing beyond what augmentation already provides.
+
+\paragraph{Octic ViT ($D_4$-equivariant).}
+Nordstr\"{o}m et al.~\cite{nordstrom2025octicvisiontransformersquicker} replace each standard ViT layer with a $D_4$-equivariant variant. By Schur's lemma (\S\ref{sec:prelim}), equivariant linear maps act independently on each irreducible component; consequently, the embedding space decomposes as
+\begin{equation}
+  \mathbb{R}^d \;\cong\;
+  \underbrace{(\mathbb{R}^{d/8})_{A_1} \oplus (\mathbb{R}^{d/8})_{A_2}
+              \oplus (\mathbb{R}^{d/8})_{B_1} \oplus (\mathbb{R}^{d/8})_{B_2}}_{\text{four 1-dim irreps}}
+  \oplus
+  \underbrace{(\mathbb{R}^{d/4})_E}_{\text{one 2-dim irrep}}.
+\end{equation}
+Invariant pooling projects onto the trivial component $A_1$, yielding a $D_4$-invariant output $z$. This encoder is trained with block P augmentations only.
+
+\paragraph{Shift-Equivariant ViT ($\mathbb{Z}^2$-equivariant).}
+Rojas-Gomez et al.~\cite{rojasgomez2023makingvisiontransformerstruly} enforce exact cyclic shift-equivariance by replacing four ViT modules with adaptive polyphase variants: an A-token module (per-sample polyphase offset selection), A-WSA (adaptive window self-attention partition), A-PMerge (polyphase downsampling), and A-RPE (circular relative position encoding). These four modifications together achieve exact shift-equivariance without introducing any additional learnable parameters. Trained with block P augmentations only.
+
+\paragraph{Harmformer ($SE(2)$-equivariant).}
+Karella et al.~\cite{karella2024harmformerharmonicnetworksmeet} combine circular harmonic filters (steerable feature maps) with transformer self-attention blocks, achieving equivariance to continuous roto-translations. Unlike Octic ViT, which handles only $90^\circ$ multiples of the dihedral group, Harmformer handles arbitrary rotation angles, providing a strictly more general symmetry guarantee at the cost of higher computational overhead. Trained with block P augmentations only.
+
+All encoders are pre-trained on ImageNet-1K using the DINOv2~\cite{oquab2024dinov2} self-supervised recipe.
+
+\subsection{Fusion Module}
+
+The fusion module combines two embeddings $z_1, z_2 \in \mathbb{R}^d$ into a scalar via a two-layer MLP applied to element-wise features:
+\begin{equation}
+  h_\psi(z_1, z_2) = W_2\,\mathrm{ReLU}\!\bigl(W_1\,[|z_1 - z_2|\;\|\;z_1 \odot z_2] + b_1\bigr) + b_2,
+\end{equation}
+where $|\cdot|$ denotes element-wise absolute value, $\odot$ element-wise product, and $[\cdot\|\cdot]$ concatenation.
+
+\begin{proposition}[Symmetry of the fusion module]
+$h_\psi(z_1, z_2) = h_\psi(z_2, z_1)$.
+\end{proposition}
+\begin{proof}
+$|z_1 - z_2| = |z_2 - z_1|$ and $z_1 \odot z_2 = z_2 \odot z_1$;
+therefore the concatenated input to the MLP is the same under transposition.
+\end{proof}
+
+\subsection{$L^2$ Contrastive Regularizer}
+
+The contrastive regularizer (introduced in \S\ref{sec:problem}) is
+\begin{equation}
+  \mathcal{L}_\mathrm{contr}^{L^2}(z_1, z_2, y)
+    = y\,\|z_1 - z_2\|_2^2
+      + (1 - y)\,\max\!\bigl(0,\, m - \|z_1 - z_2\|_2\bigr)^2.
+\end{equation}
+
+We use $L^2$ distance rather than cosine similarity for a principled reason. As established by Hadsell et al.~\cite{hadsell2006dimensionality}, the $L^2$ contrastive formulation is motivated by its geometric properties: $\|z_1 - z_2\|_2$ is an \emph{isometric invariant}, preserved by any orthogonal transformation of the embedding space. This makes it naturally compatible with $G$-invariant encoders that may differ from one another only by an isometry of $\mathbb{R}^d$. Cosine similarity, by contrast, is scale-dependent --- it is not preserved by orthogonal maps that mix the direction and magnitude of vectors --- and therefore does not share this property.
+
+\begin{proposition}[Isometry invariance of $\mathcal{L}_\mathrm{contr}^{L^2}$]
+Let $U \colon \mathbb{R}^d \to \mathbb{R}^d$ be an orthogonal map.
+Then $\mathcal{L}_\mathrm{contr}^{L^2}(Uz_1, Uz_2, y) = \mathcal{L}_\mathrm{contr}^{L^2}(z_1, z_2, y)$.
+\end{proposition}
+\begin{proof}
+$\|Uz_1 - Uz_2\|_2 = \|U(z_1 - z_2)\|_2 = \|z_1 - z_2\|_2$,
+since orthogonal maps preserve the $L^2$ norm.
+\end{proof}
+
+For each encoder we compare two conditions: $\lambda > 0$ (with $L^2$ regularizer) and $\lambda = 0$ (without).
+
+\subsection{Augmentation Blocks}\label{sec:aug}
+
+Block P (photometric augmentations) is applied to all encoders during training:
+
+\medskip
+\noindent
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Transform} & \textbf{Parameters} \\
+\midrule
+ColorJitter & brightness=0.2, contrast=0.2, saturation=0.1, hue=0.05 \\
+RandomGrayscale & $p=0.05$ \\
+GaussianBlur & kernel=3, $p=0.1$ \\
+ImageNet normalization & $\mu=(0.485,0.456,0.406)$, $\sigma=(0.229,0.224,0.225)$ \\
+\bottomrule
+\end{tabular}
+
+\medskip
+Block G (geometric augmentations) is applied only to ViT-L/16 (augmented):
+
+\medskip
+\noindent
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Transform} & \textbf{Parameters} \\
+\midrule
+RandomHorizontalFlip & $p=0.5$ \\
+RandomVerticalFlip & $p=0.5$ \\
+RandomChoice of rotation & $\{0^\circ, 90^\circ, 180^\circ, 270^\circ\}$ \\
+RandomResizedCrop & scale=$(0.7,1.0)$, ratio=$(0.9,1.1)$ \\
+\bottomrule
+\end{tabular}
+
+\medskip
+Equivariant encoders guarantee the same embedding for any $g \in G$ applied to the input by design, so adding block G augmentation for them would produce zero-gradient pairs for the head --- not harmful, but redundant. The core experimental hypothesis is therefore that block G can be dropped for equivariant encoders without loss of detection performance.
+
+\subsection{Theoretical Properties: Invariance Propagation}
+
+\begin{proposition}[Invariance propagation]
+If $\varphi_\theta$ is $G$-invariant, then $f_\theta(g \cdot x_1, g \cdot x_2) = f_\theta(x_1, x_2)$
+for all $g \in G$ and all $x_1, x_2 \in \mathcal{X}$.
+\end{proposition}
+\begin{proof}
+$G$-invariance of $\varphi_\theta$ gives $\varphi_\theta(g \cdot x_i) = \varphi_\theta(x_i)$ for $i = 1, 2$.
+Since $h_\psi$ and $\sigma$ are deterministic functions of their inputs, the output of $f_\theta$ is unchanged.
+\end{proof}
+
+This guarantees that the model's plagiarism score is the same regardless of which $g \in G$ is applied to the input pair, matching the invariance required for geometric plagiarism detection.
 
 \section{Experiments}\label{sec:exp}
 % Task 8: Experiments placeholder
