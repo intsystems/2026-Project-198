@@ -1,5 +1,4 @@
 \documentclass{article}
-
 \PassOptionsToPackage{numbers, sort, compress}{natbib}
 \usepackage[main,final]{neurips_2025}
 
@@ -11,167 +10,55 @@
 \usepackage{nicefrac}
 \usepackage{microtype}
 \usepackage{xcolor}
-
-%%%
-
 \usepackage{subcaption}
 \usepackage{graphicx}
 \usepackage{multirow}
 \usepackage{amsmath,amssymb,amsfonts}
 \usepackage{amsthm}
-\usepackage{mathrsfs}
-\usepackage{xcolor}
-\usepackage{textcomp}
-\usepackage{manyfoot}
-\usepackage{algorithm}
-\usepackage{algorithmicx}
-\usepackage{algpseudocode}
-\usepackage{listings}
 
-\newtheorem{theorem}{Theorem} % continuous numbers
-%%\newtheorem{theorem}{Theorem}[section] % sectionwise numbers
-%% optional argument [theorem] produces theorem numbering sequence instead of independent numbers for Proposition
-\newtheorem{proposition}[theorem]{Proposition}% 
-\newtheorem{lemma}{Lemma}% 
-%%\newtheorem{proposition}{Proposition} % to get separate numbers for theorem and proposition etc.
-
-\newtheorem{example}{Example}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}{Lemma}
+\newtheorem{definition}{Definition}
 \newtheorem{remark}{Remark}
 
-\newtheorem{definition}{Definition}
-\newtheorem{assumption}{Assumption}
-
-%%%
-
-
-\title{Analysis of the Group Structure of Square Symmetries in an Image Transformation Sequence Prediction Model}
-
-
-% The \author macro works with any number of authors. There are two commands
-% used to separate the names and addresses of multiple authors: \And and \AND.
-%
-% Using \And between authors leaves it to LaTeX to determine where to break the
-% lines. Using \AND forces a line break at that point. So, if LaTeX puts 3 of 4
-% authors names on the first line, and the last on the second line, try using
-% \AND instead of \And before the third author name.
-
+\title{Image Plagiarism Detection with Equivariant Encoders}
 
 \author{
   Denis Gudkov\\
   Intelligent Systems\\
-  Moscow, Russia\\
   \texttt{email@gmail.com}\\
-  % \And
-  % Name Surname\\
-  % MIPT\\
-  % Moscow, Russia\\
-  % \texttt{email@phystech.edu}\\
 }
 
-
 \begin{document}
-
-
 \maketitle
 
 \begin{abstract}
-  Modern vision models excel at recognition but fail to grasp geometric relationships like symmetry composition. This work investigates whether neural networks can internalize the algebraic 
-  structure of the dihedral group $D_4$ (square symmetries) rather than memorizing visual patterns. Using a Siamese $D_4$-equivariant encoder and embedding similarity scorings, we 
-  train a model to predict whether two images are related by a $D_4$ transformation 
-  and identify the specific element. Here, \emph{Siamese} refers to a dual-branch 
-  weight-sharing architecture that processes image pairs jointly, and 
-  \emph{equivariant} means the encoder's embeddings transform predictably under 
-  the same group action applied to the input. We demonstrate that the model learns true group properties: invariance to operation sequences 
-  ($\mathtt{horizontal\_flip} \to \mathtt{vertical\_flip} \equiv \mathtt{rotate\_180}$), canonical element representation, and correct rejection of unrelated pairs. Analysis of attention 
-  maps and embeddings reveals internal encoding of the  multiplication table. Unlike VLMs that fail at such tasks, our architecture captures symbolic geometric structures.
+% Task 2: Abstract placeholder
 \end{abstract}
 
-\textbf{Keywords:} TODO
-
 \section{Introduction}\label{sec:intro}
-
-% --- (1) Research goal and motivations ---
-Deep learning has achieved remarkable success in visual recognition tasks~\cite{he2016deep, dosovitskiy2021image}, yet recent evaluations reveal that even state-of-the-art vision-language models struggle with spatial reasoning: they fail to reliably judge relative positions, estimate distances, or identify geometric relationships between objects in a scene~\cite{chen2024spatialvlm, cheng2024spatialrgpt}. A particularly underexplored failure mode is \emph{compositional} geometric reasoning --- for instance, recognizing that applying a horizontal flip followed by a vertical flip is equivalent to a $180°$ rotation. The goal of this work is to investigate whether a neural network can internalize the algebraic structure of a symmetry group --- not merely memorize visual patterns --- and to identify the architectural choices that make this possible.
-
-% --- (2) Object of research, main termini ---
-As a testbed we use the dihedral group $D_4$, the symmetry group of the square. $D_4$ is a non-abelian group of order~8 comprising four rotations ($e, r_{90}, r_{180}, r_{270}$) and 
-four reflections ($\sigma_h, \sigma_v, \sigma_{d}, \sigma_{d'}$), equipped with a well-defined multiplication table. Its non-commutativity and subgroup hierarchy make it the smallest group 
-that is algebraically nontrivial while remaining small enough for exhaustive behavioral analysis of model predictions.
-
-% --- (3) The problem / challenge ---
-We formalize the task as follows: given a pair of images $(I_1, I_2)$, the model must determine whether $I_2$ can be obtained from $I_1$ by applying some element $g \in D_4$, and if so, identify~$g$. This is harder than standard image classification because the model must implicitly learn that composition of operations is well-defined, that every transformation has an inverse, and that visually distinct operation sequences may correspond to the same group element. A further challenge is the \emph{rejection} case: the model must correctly identify pairs not related by any element of~$D_4$.
-
-% --- (4) Methodology: literature review and state-of-the-art ---
-% --- (7) Pros and cons of recent works ---
-Several lines of prior work inform our approach. \emph{Equivariant architectures.} Cohen and Welling~\cite{cohen2016group} introduced Group Equivariant CNNs (G-CNNs), showing that encoding symmetries into network layers improves sample efficiency. Weiler and Cesa~\cite{weiler2019general} generalized this to $E(2)$-equivariant steerable CNNs, providing a flexible library (\texttt{e2cnn}) for building networks equivariant to arbitrary subgroups of the Euclidean group. However, these works focus on building equivariance \emph{into} the feature extraction pipeline; they do not address whether the network can discover the \emph{group operation itself} from data. \emph{Algebraic reasoning in neural networks.} Power et al.~\cite{power2022grokking} demonstrated that small transformers can learn binary operations on finite groups through a phenomenon called ``grokking'': generalization occurs long after overfitting. Nanda et al.~\cite{nanda2023progress} provided mechanistic interpretability for this, showing that the networks discover Fourier-based representations of modular arithmetic. A limitation of these studies is that they operate on abstract symbolic inputs ($a \circ b = c$) rather than on visual data, leaving open whether similar algebraic reasoning can emerge from pixel-level observations. \emph{Geometric deep learning} as a unifying framework is surveyed by Bronstein et al.~\cite{bronstein2021geometric}, who formalize symmetry as an inductive bias across architectures; our work contributes an empirical case study in the visual domain.
-
-% --- (5) Project tasks ---
-% --- (6) Proposed solution, novelty, advantages ---
-We propose a Siamese architecture with a $D_4$-equivariant encoder based on steerable CNNs~\cite{weiler2019general}. Given an image pair $(I_1, I_2)$, the encoder produces embeddings $\mathbf{z}_1, \mathbf{z}_2$; the predicted transformation is identified by applying each of the eight group element representations to~$\mathbf{z}_1$ and selecting the one whose result best aligns with~$\mathbf{z}_2$ by dot-product similarity. Unlike prior grokking studies~\cite{power2022grokking, nanda2023progress} that work with symbolic tokens, our model operates directly on images and must extract the group structure from pixel data. Unlike standard equivariant classification~\cite{cohen2016group, weiler2019general}, we do not only exploit equivariance for feature extraction but require the model to \emph{predict the group element itself}. The novelty of this work is threefold: (i)~we demonstrate that a neural network can learn the $D_4$ multiplication table from visual data, achieving invariance to equivalent operation sequences; (ii)~we provide a controlled ablation comparing standard CNN encoders against $D_4$-equivariant encoders, quantifying the effect of geometric inductive bias on algebraic reasoning; and (iii)~we analyze the learned embedding space and show that its geometry reflects the group-theoretic structure of~$D_4$.
-
-% --- (8) Goal of experiment, setup, datasets, workflow ---
-We evaluate the proposed model on image pairs constructed from a standard vision dataset by applying all $D_4$ transformations, supplemented with negative pairs not related by any group element. The experimental workflow consists of three stages: training the Siamese encoder on transformation identification, evaluating accuracy on held-out pairs including equivalent operation sequences and rejection cases, and analyzing the embedding geometry via clustering and distance metrics. We compare $D_4$-equivariant and standard CNN encoders under identical training conditions to isolate the effect of the geometric prior.
-
-% --- Chief Editor formula ---
-In summary, this paper proposes a Siamese equivariant architecture for predicting $D_4$ transformations from image pairs, providing evidence that neural networks can discover group-algebraic structure from visual data, and is distinguished from prior work by operating on pixel-level inputs rather than symbolic tokens and by explicitly ablating the role of equivariant inductive bias.
-
-The remainder of the paper is organized as follows. Section~\ref{sec:related} reviews related work. Section~\ref{sec:problem} formalizes the $D_4$ group structure. Section~\ref{sec:method} details the architecture and training procedure. Section~\ref{sec:experiments} presents experimental results, and Section~\ref{sec:interpretability} provides interpretability analysis. Section~\ref{sec:conclusion} discusses limitations and future directions.
-
-\textbf{Contributions.} Our contributions can be summarized as follows:
-\begin{itemize}
-    \item We present...
-    \item We demonstrate the validity of our theoretical results through empirical studies...
-    \item We highlight the implications of our findings for...
-\end{itemize}
-
-\textbf{Outline.} The rest of the paper is organized as follows...
+% Task 3: Introduction placeholder
 
 \section{Related Work}\label{sec:rw}
+% Task 4: Related Work placeholder
 
-\textbf{Topic \#1.}
-TODO
+\section{Problem Statement}\label{sec:problem}
+% Task 5: Problem Statement placeholder
 
-\textbf{Topic \#2.}
-TODO
-
-\section{Preliminaries}\label{sec:prelim}
-
-\subsection{General notation}
-
-In this section, we introduce the general notation used in the rest of the paper and the basic assumptions. 
-
-\subsection{Assumptions} 
-
-TODO
+\section{Preliminaries: Equivariance}\label{sec:prelim}
+% Task 6: Preliminaries placeholder
 
 \section{Method}\label{sec:method}
+% Task 7: Method placeholder
 
 \section{Experiments}\label{sec:exp}
-
-To verify the theoretical estimates obtained, we conducted a detailed empirical study...
-
-\section{Discussion}\label{sec:disc}
-
-TODO
+% Task 8: Experiments placeholder
 
 \section{Conclusion}\label{sec:concl}
-
-TODO
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Task 9: Conclusion placeholder
 
 \bibliographystyle{unsrtnat}
 \bibliography{references}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\newpage
-\appendix
-\section{Appendix / supplemental material}\label{app}
-
-\subsection{Additional experiments / Proofs of Theorems}\label{app:exp}
-
-TODO
 
 \end{document}
