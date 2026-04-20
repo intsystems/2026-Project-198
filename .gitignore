@@ -1,11 +1,16 @@
-# Custom
+# Custom — local tooling, IDE, agent skills (not committed)
 .DS_Store
 .agents/
+.agents/skills/find-skills/
 .claude/
+.cursor/skills/
 .vscode/
 thesis/
 docs/
+docs/superpowers/plans/
 skills-lock.json
+.orchestra-skills.json
+CLAUDE.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
