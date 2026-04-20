@@ -1,0 +1,82 @@
+# Default configuration for Image Plagiarism Detection with Equivariant Encoders
+# All hyperparameters from Table 2 of the paper
+
+seed: 42
+
+data:
+  coco_root: "/data/coco2017"          # path to COCO2017 images (train2017/)
+  domainnet_root: "/data/domainnet"    # path to DomainNet
+  image_size: 224
+  val_size: 0.1                        # fraction of COCO used for validation during training
+  num_workers: 4
+  pin_memory: true
+
+  # DomainNet evaluation
+  domainnet_domains:
+    - real
+    - painting
+    - clipart
+    - quickdraw
+    - infograph
+    - sketch
+  pairs_per_domain: 100                # 100 pos + 100 neg per domain = 1200 total
+
+training:
+  batch_size: 32
+  num_epochs: 15
+  optimizer: "adamw"
+  lr: 1.0e-3
+  weight_decay: 1.0e-2
+  scheduler: "multistep"
+  milestones: [5, 10]
+  gamma: 0.5
+  bce_weight_pos: 0.3
+  bce_weight_neg: 0.7
+
+contrastive:
+  margin: 1.0
+  lambda_reg: 0.1                      # set to 0.0 for no-regularizer runs
+
+encoder:
+  name: "vit_baseline"                 # vit_baseline | vit_augmented | octic_vit | shift_eq_vit | harmformer
+  freeze: true
+  weights_path: null                   # path to pretrained weights (e.g. DINOv2 or Octic)
+
+augmentation:
+  skip_geometric: true                 # true = Block P only; false = Block P + Block G
+  skip_photometric_train: false        # true = train uses clean only (no Block P)
+  skip_photometric_val: true           # true = val uses clean (no Block P); false = Block P on val
+  # Block P (photometric) - applied to all encoders
+  color_jitter:
+    brightness: 0.2
+    contrast: 0.2
+    saturation: 0.1
+    hue: 0.05
+  grayscale_prob: 0.05
+  gaussian_blur_kernel: 3
+  gaussian_blur_prob: 0.1
+  # Block G (geometric) - applied only when skip_geometric=false
+  hflip_prob: 0.5
+  vflip_prob: 0.5
+  rotation_choices: [0, 90, 180, 270]
+  resized_crop_scale: [0.7, 1.0]
+  resized_crop_ratio: [0.9, 1.1]
+
+evaluation:
+  # Plagiarism transformation classes
+  transform_classes:
+    - "CJ"      # ColorJitter
+    - "GN"      # Gaussian Noise
+    - "GS"      # Gaussian Blur (Grayscale)
+    - "R90"     # Rotation 90
+    - "R180"    # Rotation 180
+    - "R270"    # Rotation 270
+    - "WM"      # Watermark
+    - "COMBO"   # Combined transformations
+  tsne_perplexity: 30
+
+output:
+  dir: "outputs"
+  checkpoints: "outputs/checkpoints"
+  logs: "outputs/logs"
+  figures: "outputs/figures"

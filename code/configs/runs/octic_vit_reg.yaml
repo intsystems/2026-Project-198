@@ -1,0 +1,14 @@
+# Octic ViT D4-equivariant (Block P only, with L2 regularizer)
+defaults:
+  - override /: default
+
+encoder:
+  name: "octic_vit"
+  freeze: true
+  weights_path: null  # set to path of D4 DINOv2 checkpoint
+
+augmentation:
+  skip_geometric: true
+
+contrastive:
+  lambda_reg: 0.1

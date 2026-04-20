@@ -1,0 +1,13 @@
+# ViT-L/16 augmented (Block P + G, no L2 regularizer)
+defaults:
+  - override /: default
+
+encoder:
+  name: "vit_augmented"
+  freeze: true
+
+augmentation:
+  skip_geometric: false
+
+contrastive:
+  lambda_reg: 0.0

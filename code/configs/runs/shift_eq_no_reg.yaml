@@ -1,0 +1,13 @@
+# Shift-Equivariant ViT Z2 (Block P only, no L2 regularizer)
+defaults:
+  - override /: default
+
+encoder:
+  name: "shift_eq_vit"
+  freeze: false
+
+augmentation:
+  skip_geometric: true
+
+contrastive:
+  lambda_reg: 0.0

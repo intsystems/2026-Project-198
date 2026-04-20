@@ -1,0 +1,13 @@
+# ViT-L/16 baseline (Block P only, with L2 regularizer)
+defaults:
+  - override /: default
+
+encoder:
+  name: "vit_baseline"
+  freeze: true
+
+augmentation:
+  skip_geometric: true
+
+contrastive:
+  lambda_reg: 0.1
