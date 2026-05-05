@@ -14,6 +14,7 @@
 \usepackage{graphicx}
 \usepackage{multirow}
 \usepackage{amsmath,amssymb,amsfonts}
+\usepackage{bbm}
 \usepackage{amsthm}
 
 \newtheorem{theorem}{Theorem}
@@ -24,486 +25,163 @@
 
 \title{Image Plagiarism Detection with Equivariant Encoders}
 
-\author{
+\author{%
   Denis Gudkov\\
-  Intelligent Systems\\
-  \texttt{email@gmail.com}\\
+  Intelligent Systems Department, MIPT\\
+  \texttt{gudkov.dv@phystech.edu}
 }
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-Image plagiarism detection should remain robust to rotations, reflections, and integer shifts of the pixel grid. We ask whether encoding these symmetries as an architectural constraint outperforms approximating them with data augmentation. We train a siamese detector with equivariant ViT encoders under three symmetry groups - $D_4$, $\mathbb{Z}^2$, and $SE(2)$ - combined with an $L^2$ contrastive regularizer, and compare them against an augmented ViT-L/16 baseline on a balanced DomainNet protocol. We report per-transformation FPR and Recall across 10 training runs covering five encoders and two regularization conditions.
+A pirated image is rarely a pixel-perfect copy: rotations, reflections, crops, and re-compression are routine, and a detector should map all of them to the same point in feature space. We ask whether building these symmetries into the encoder of a siamese plagiarism detector is preferable to approximating them with data augmentation. Three encoders are compared inside one pipeline: a non-equivariant ViT-Tiny/16 baseline trained with geometric augmentation, an Octic ViT with exact dihedral invariance under multiples of ninety-degree rotation and reflection, and a Harmformer with continuous roto-translational invariance covering arbitrary rotation angles and planar translations. Training pairs are formed on COCO\,2017 with a cross-batch protocol; evaluation uses 1\,200 cross-domain pairs sampled from DomainNet across six visually distinct domains. We report false positive rate and recall stratified by transformation class. Results are pending; the experimental protocol is fixed.
 \end{abstract}
+
+\textbf{Keywords:} image plagiarism detection; siamese networks; equivariant Vision Transformers; group invariance; contrastive learning; DomainNet.
 
 \section{Introduction}\label{sec:intro}
 
-Image plagiarism detection asks whether two images $x$ and $x'$ depict the same underlying content after one of them has been transformed geometrically or photometrically. The question we study is direct: does building geometric symmetry into the encoder architecture improve plagiarism detection over relying on data augmentation alone? We compare five encoder configurations across three symmetry groups, $D_4$, $\mathbb{Z}^2$, and $SE(2)$, within a single siamese framework, training each with and without an $L^2$ contrastive regularizer on a balanced cross-domain benchmark.
+Two images depict the same content under a plagiarist's edits when one differs from the other by a rotation, a reflection, a crop, or a photometric perturbation, and a detector should map both to the same point in feature space. The question we study is whether to enforce this invariance through the encoder architecture or to approximate it through geometric augmentation at training time. The detector receives a pair of RGB images and returns a similarity score in the unit interval. Positive pairs are produced by composing a geometric transformation, drawn either from the dihedral group of the square or from the special Euclidean group of the plane, with a photometric perturbation that covers brightness and contrast jitter, blur, additive noise, JPEG re-compression, and watermark overlays. Negative pairs consist of two images sampled independently from the same visual domain. The encoder is shared between the two siamese branches and the head is symmetric in its arguments, so that any geometric variant of an image arrives at the same comparison.
 
-The objects of study are pairs of natural images related by transformations drawn from $D_4$ (rotations by multiples of $90^\circ$ and reflections), $\mathbb{Z}^2$ (integer pixel shifts), or $SE(2)$ (arbitrary rotations and translations), compounded with photometric perturbations such as brightness jitter, contrast scaling, and JPEG compression. Standard Vision Transformers (ViTs)~\cite{dosovitskiy2021image} lack geometric invariance by construction: patch-embedding tokenization is not equivariant to rotations or reflections, and self-attention treats spatial position through learned positional encodings that do not extrapolate well outside the training distribution. A common workaround is geometric augmentation, but augmentation only stochastically covers the orbit of a transformation group, inflates training cost, and offers no invariance guarantee on unseen perturbations. Model scale does not resolve the underlying limitation: recent evidence indicates that spatial and geometric reasoning fails to improve with scale alone~\cite{chen2024spatialvlm}. This motivates embedding the desired symmetry as an inductive bias in the architecture itself, along the lines of geometric deep learning~\cite{bronstein2021geometric,cohen2016group}.
+Standard Vision Transformers~\citep{dosovitskiy2021image} provide no geometric guarantee. Patch tokenization commutes with neither rotation nor reflection, and learned positional encodings do not extrapolate beyond the training distribution; geometric augmentation can only cover the orbit of a transformation group stochastically, inflates training cost, and makes no promise on transformations unseen during training. Scale alone does not close this gap, since spatial reasoning of large vision models has been shown to fail to improve with parameter count~\citep{chen2024spatialvlm}. Geometric deep learning~\citep{bronstein2021geometric, cohen2016group, weiler2019general} formalizes the alternative, in which the desired invariance is built into the architecture as commutation with a group action and then propagates exactly through the network. Two recent ViT variants make this concrete on transformer backbones. The Octic ViT~\citep{nordstrom2025octic} enforces exact dihedral equivariance through group-structured weight sharing on the eight orientations of the square and reduces FLOPs by forty percent relative to a standard ViT of comparable expressivity. Harmformer~\citep{karella2024harmformer} replaces patch projections with circular harmonic filters so that self-attention commutes with continuous in-plane rotations and translations, and therefore covers all rotation angles, not only multiples of ninety degrees. The siamese template, on which the detector is built, is due to~\citet{bromley1993signature}; the closest plagiarism-specific baseline is the pairwise ViT detector of~\citet{dorin2024pairwise}, which fixes our training protocol but offers no invariance guarantee.
 
-Formally, an encoder $\mathrm{phi}_{\mathrm{theta}} : \mathcal{X} \to \mathcal{Z}$ is \emph{$G$-equivariant} if $\mathrm{phi}_{\mathrm{theta}}(g \cdot x) = \mathrm{rho}(g)\,\mathrm{phi}_{\mathrm{theta}}(x)$ for all $g \in G$ and all images $x$, where $\mathrm{rho}$ is a representation of $G$ on the embedding space $\mathcal{Z}$; it is \emph{$G$-invariant} when $\mathrm{rho}$ is the trivial representation, i.e.\ $\mathrm{phi}_{\mathrm{theta}}(g \cdot x) = \mathrm{phi}_{\mathrm{theta}}(x)$. In plagiarism detection the siamese head compares embeddings $z = \mathrm{phi}_{\mathrm{theta}}(x)$ and $z' = \mathrm{phi}_{\mathrm{theta}}(x')$, so invariance of $\mathrm{phi}_{\mathrm{theta}}$ directly implies that geometric variants of the same image collapse to the same embedding without any augmentation. Full theoretical treatment of these properties is deferred to Section~\ref{sec:prelim}.
+The closest alternatives illustrate the trade-off. A non-equivariant siamese ViT, as in~\citet{dorin2024pairwise}, learns geometric robustness only in expectation over the augmentation distribution, so any orbit element under-sampled at training time becomes a candidate failure mode at test time. Classical near-duplicate detection based on local descriptors and geometric verification~\citep{ke2004efficient} is invariant by construction but degrades under domain shift and photometric edits, where transformer-based features are stronger. Among architectural alternatives, the Octic ViT~\citep{nordstrom2025octic} guarantees invariance to rotations by multiples of ninety degrees and to reflections, but covers no other angle, while Harmformer~\citep{karella2024harmformer} extends the guarantee to all rotation angles at a higher compute cost. None of these architectures has been evaluated on pairwise plagiarism detection, which is the specific gap we address.
 
-Several recent lines of work target geometric robustness in vision transformers. Nordstr\"{o}m et al.~\cite{nordstrom2025octic} introduce the Octic ViT, which enforces exact $D_4$-equivariance through group-structured weight sharing and reduces FLOPs by 40\% relative to a standard ViT of equal expressivity. Rojas-Gomez et al.~\cite{rojasgomez2024shift} design a Shift-Equivariant ViT that achieves exact $\mathbb{Z}^2$-invariance via anti-aliased downsampling and circular padding, but does not address rotational equivariance. Karella et al.~\cite{karella2024harmformer} propose Harmformer, which lifts transformers to the continuous group $SE(2)$ using harmonic feature maps and obtains equivariance to arbitrary in-plane rotations and translations at a higher compute cost. On the side of learned features and plagiarism-specific architectures, Oquab et al.~\cite{oquab2024dinov2} show that DINOv2 pre-training on large unlabeled image collections yields transferable representations, and Dorin et al.~\cite{dorin2024pairwise} establish a siamese ViT baseline for pairwise plagiarism detection with false positive rate (FPR) as the primary evaluation metric~\cite{bromley1993signature}.
+The contribution is a single siamese pipeline that wraps three encoders, a non-equivariant ViT-Tiny/16 baseline, an Octic ViT, and a Harmformer, and pits architectural group invariance against geometric augmentation under matched conditions. Two elements distinguish the setup from~\citet{dorin2024pairwise}. The first is a contrastive regularizer based on the squared Euclidean distance between embeddings~\citep{hadsell2006dimensionality, chopra2005learning}, which depends only on Euclidean distances in the feature space and is therefore preserved under any orthogonal change of basis on that space; the property aligns the loss geometry with the geometry of group-invariant encoders. The second is a controlled augmentation ablation: each equivariant encoder is trained without group augmentation, while the ViT-Tiny/16 baseline is trained with the corresponding group-specific augmentation block, so that any difference in error attributes to architectural inductive bias rather than to data exposure. The computational experiment estimates whether group-invariant encoders trained without the group augmentation block match or exceed the augmented baseline on false positive rate and per-class recall on a balanced cross-domain test of 1\,200 pairs sampled from DomainNet~\citep{peng2019domainnet}; training pairs are constructed on COCO\,2017 with the cross-batch protocol of~\citet{dorin2024pairwise}.
 
-We propose a siamese plagiarism detector with $G$-equivariant ViT encoders that provides exact invariance under $D_4$, $\mathbb{Z}^2$, or $SE(2)$ without geometric augmentation. Relative to Dorin et al.~\cite{dorin2024pairwise}, two elements are new: (i) an $L^2$ contrastive regularizer that penalizes the Euclidean distance between embeddings of genuine pairs and pushes impostor pairs beyond a margin, and (ii) a controlled augmentation ablation that pits geometric augmentation against equivariant inductive bias across three symmetry groups in one framework. Concretely, we train five encoder configurations - standard ViT with augmentation, DINOv2-pretrained ViT, Octic ViT ($D_4$), Shift-Equivariant ViT ($\mathbb{Z}^2$), and Harmformer ($SE(2)$) - initialized with DINOv2 weights on ImageNet-1K where architecturally compatible, each in two conditions: with and without the $L^2$ contrastive regularizer.
-
-\begin{table}[t]
-\centering
-\caption{Comparison of approaches to geometric robustness in image matching.}
-\label{tab:comparison}
-\begin{tabular}{@{}lllll@{}}
-\toprule
-Method & Group & Exactness & Strengths & Weaknesses \\
-\midrule
-Dorin et al.~\cite{dorin2024pairwise} & None & Approximate & Flexible; strong features & No invariance guarantee \\
-Octic ViT~\cite{nordstrom2025octic} & $D_4$ & Exact & 40\% FLOPs reduction & Discrete; $90^\circ$ only \\
-Shift-Eq.\ ViT~\cite{rojasgomez2024shift} & $\mathbb{Z}^2$ & Exact & Exact shift invariance & No rotation equivariance \\
-Harmformer~\cite{karella2024harmformer} & $SE(2)$ & Exact & Arbitrary angles + shifts & Higher compute cost \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The experiment comprises 10 runs (5 encoders $\times$ \{with, without\} $L^2$ regularizer) evaluated on a class-balanced subset of DomainNet spanning six visual domains. Primary metrics are FPR and Recall at a fixed decision threshold; the secondary metric is F1. This design isolates the contribution of each inductive bias and tests whether exact geometric invariance reduces false positives relative to an augmentation-only baseline. Table~\ref{tab:comparison} summarises the methods compared.
-
-The remainder of this paper is organized as follows. Section~\ref{sec:rw} reviews related work on equivariant networks, siamese architectures, and plagiarism detection. Section~\ref{sec:problem} formalizes the detection task and evaluation protocol. Section~\ref{sec:prelim} develops the theoretical background on group equivariance. Section~\ref{sec:method} describes the siamese framework, encoder configurations, and the $L^2$ contrastive regularizer. Section~\ref{sec:exp} presents experimental results and ablations. Section~\ref{sec:concl} concludes with limitations and future directions.
+The remainder of the paper proceeds as follows. Section~\ref{sec:rw} reviews siamese detectors, equivariant networks, and equivariant ViTs. Section~\ref{sec:problem} formalizes the detection task and states the equivariance hypothesis. Section~\ref{sec:prelim} fixes notation for group actions, representations, and equivariance. Section~\ref{sec:method} describes the three encoders, the symmetric fusion head, and the loss. Section~\ref{sec:exp} reports the experimental protocol with placeholder results. Section~\ref{sec:concl} concludes.
 
 \section{Related Work}\label{sec:rw}
 
-\paragraph{Siamese detectors for image matching and plagiarism.}
-Bromley et al.~\cite{bromley1993signature} introduced siamese networks for signature verification: a shared-weight twin architecture with a learned distance metric that extends to any pairwise similarity task. Classical near-duplicate detection relied on compact local descriptors combined with geometric verification~\cite{ke2004efficient}, an approach that breaks under large photometric or domain shifts. Dorin et al.~\cite{dorin2024pairwise} applied a siamese ViT with contrastive loss to image plagiarism detection on DomainNet, reporting FPR as the primary metric and using a cross-batch pairing strategy. We extend their protocol with equivariant encoders and an $L^2$ contrastive regularizer defined on Euclidean distances in the embedding space.
+Twin networks with shared weights and a learned distance were introduced by~\citet{bromley1993signature} for signature verification and have since been adopted across pairwise matching problems. Classical near-duplicate detection combined local descriptors with geometric verification~\citep{ke2004efficient}, which gave geometric robustness by construction but was brittle under domain shift and photometric edits, where modern visual features are stronger. \citet{dorin2024pairwise} applied a siamese ViT with a contrastive loss to image plagiarism on DomainNet and proposed the cross-batch pairing protocol that we reuse without modification; the pipeline reports FPR as the primary metric, but offers no invariance guarantee against geometric perturbations and depends on geometric augmentation for robustness.
 
-\paragraph{Equivariant and invariant architectures.}
-Cohen and Welling~\cite{cohen2016group} introduced G-CNNs that encode discrete symmetries into convolutional filters through group-structured weight sharing. Weiler and Cesa~\cite{weiler2019general} generalised this idea to steerable E(2)-equivariant CNNs, covering continuous rotation and reflection groups within one framework. Bronstein et al.~\cite{bronstein2021geometric} treat equivariance as an inductive bias that improves sample efficiency and generalisation across domains. These architectures have been evaluated mostly on classification and segmentation; to our knowledge, they have not been studied on pairwise image similarity in a siamese plagiarism-detection setting.
+Group-equivariant convolutional networks~\citep{cohen2016group} encode discrete symmetries through weight sharing on group orbits, and \citet{weiler2019general} extend the construction to the continuous Euclidean group $E(2)$ via steerable filters. \citet{bronstein2021geometric} treat equivariance as an inductive bias that improves sample efficiency under group-structured data, and the same line of reasoning motivates the transformer variants used here. The Octic ViT~\citep{nordstrom2025octic} replaces standard transformer layers with $D_4$-equivariant ones; by Schur's lemma, equivariant linear maps decompose blockwise across the five irreducible representations of $D_4$, which both constrains parameters and reduces FLOPs by 40\% at expressivity comparable to a non-equivariant ViT, but the resulting invariance is restricted to multiples of $90^\circ$ and reflections. Harmformer~\citep{karella2024harmformer} replaces patch projections with circular harmonic filters and combines them with self-attention to obtain continuous roto-translational equivariance over $SE(2)$, which covers every rotation angle but at a higher compute cost than $D_4$. Neither architecture has been evaluated on pairwise plagiarism detection, which leaves open whether the geometric inductive bias they provide actually reduces false positives on this specific task.
 
-\paragraph{Equivariant Vision Transformers.}
-Nordstr\"{o}m et al.~\cite{nordstrom2025octic} replace standard ViT layers with $D_4$-equivariant variants, obtaining a 40\% FLOPs reduction at accuracy comparable to the baseline ViT. Rojas-Gomez et al.~\cite{rojasgomez2024shift} enforce exact shift-equivariance through adaptive polyphase sampling, introducing A-token, A-WSA, A-PMerge, and A-RPE modules without adding learnable parameters. Karella et al.~\cite{karella2024harmformer} combine circular harmonic filters with transformer blocks to obtain continuous SE(2)-equivariance across arbitrary rotation angles. None of these architectures has been evaluated on pairwise image similarity or plagiarism detection, which leaves open whether geometric inductive bias reduces false positives on such tasks.
-
-\paragraph{Self-supervised ViT pre-training and contrastive learning.}
-DINOv2~\cite{oquab2024dinov2} produces transferable visual features via self-supervised learning on large unlabeled image collections; we use it as a common pre-training recipe across all encoders so that performance differences reflect architectural choices rather than pre-training data. Chopra et al.~\cite{chopra2005learning} proposed contrastive loss for discriminative metric learning, minimising intra-class distance while maximising inter-class distance. Hadsell et al.~\cite{hadsell2006dimensionality} introduced the $L^2$ contrastive formulation we adopt: the loss depends only on Euclidean distances, so it is preserved under orthogonal transformations of the embedding space.
+The contrastive component of our loss follows the formulation of~\citet{hadsell2006dimensionality} and the metric-learning template of~\citet{chopra2005learning}: it depends only on Euclidean distances between embeddings, which means that an orthogonal change of basis on the embedding space leaves it invariant, and that property aligns the loss geometry with the geometry of $G$-invariant encoders.
 
 \section{Problem Statement}\label{sec:problem}
-\paragraph{\textbf{1. General problem.}}
-Given a pair of images $(x_1, x_2) \in \mathcal{X} \times \mathcal{X}$, the task is binary
-classification: predict $y_{i} \in \{0,1\}$ where $y_{i}=1$ indicates that $x_2$ is a plagiarised
-derivative of $x_1$. Plagiarism is operationalised as the composition of a geometric
-transformation $g \in G$ with a photometric perturbation $\mathrm{pi} \in G_{\mathrm{photo}}$
-(colour jitter, Gaussian blur, additive noise), yielding $x_2 = (g \circ \mathrm{pi})(x_1)$.
-The detector must correctly identify such pairs regardless of which transformation was applied.
 
-\paragraph{\textbf{2. Sample set.}}
-The labelled dataset is
-\[
-  \mathcal{D} = \bigl\{(x_{1,i},\, x_{2,i},\, y_{i})\bigr\}_{i=1}^{N},
-\]
-where $y_{i} \in \{0,1\}$ and every image $x_{i} \in \mathcal{X} = [0,1]^{3 \times 224 \times 224}$.
-Each sample is a triple: a query image, a candidate image, and a binary plagiarism label.
-The dataset is balanced across positive and negative pairs and stratified by visual domain.
+We treat image plagiarism detection as a binary classification problem on image pairs: given a pair $(x_1, x_2)\in\mathcal{X}\times\mathcal{X}$, predict $y \in \{0,1\}$, where $y=1$ marks $x_2$ as a plagiarized derivative of $x_1$. Plagiarism is operationalized as the composition of a geometric transformation $g \in G$ with a photometric perturbation $\eta$, producing $x_2 = (g \circ \eta)(x_1)$. The geometric component is drawn from one of the symmetry groups $G \in \{D_4, SE(2)\}$, where $D_4$ contains the rotations of the square by multiples of $90^\circ$ and the four reflections, and $SE(2)$ contains all in-plane rotations and translations. The photometric component covers brightness and contrast jitter, Gaussian blur, additive Gaussian noise, JPEG re-compression, and watermark overlays, and is shared across all training and evaluation regimes.
 
-\paragraph{\textbf{3. Statistical hypothesis.}}
-Positive pairs are drawn from the joint distribution
-\[
-  p_+(x_1, x_2) = p(x_1)\, p_T(x_2 \mid x_1),
-\]
-where $p_T(x_2 \mid x_1) = \int_{G \times G_{\mathrm{photo}}} \mathrm{delta}(x_2 - (g \circ \mathrm{pi})(x_1))\, d\mathrm{mu}(g, \mathrm{pi})$
-is the mixture of transformation kernels over $G \cup G_{\mathrm{photo}}$.
-Negative pairs are obtained by sampling $x_1$ and $x_2$ independently from the marginal $p(x)$,
-so $p_-(x_1, x_2) = p(x_1)\,p(x_2)$.
-The detector must distinguish the two regimes on held-out data.
+The labelled dataset is $\mathcal{D} = \{(x_{1,i}, x_{2,i}, y_i)\}_{i=1}^{N}$ with $x_{\cdot,i} \in \mathcal{X} = [0,1]^{3\times 224\times 224}$ and $y_i \in \{0,1\}$, balanced between positive and negative pairs and stratified by visual domain. Positive pairs are drawn from the joint distribution $p_+(x_1, x_2) = p(x_1)\,p_T(x_2 \mid x_1)$, where $p_T(x_2 \mid x_1) = \int \delta\bigl(x_2 - (g\circ\eta)(x_1)\bigr)\,d\mu(g, \eta)$ and $\mu$ is a fixed mixture over $G \cup G_{\mathrm{photo}}$. Negative pairs are independent draws from the marginal of the same domain, $p_-(x_1, x_2) = p(x_1)\,p(x_2)$, which produces hard negatives with shared visual statistics rather than easy contrasts across unrelated images. All images are resized to $224\times 224$ and normalised per channel using ImageNet statistics; the test pool spans six DomainNet~\citep{peng2019domainnet} domains: real, painting, clipart, quickdraw, infograph, and sketch.
 
-\paragraph{\textbf{4. Measurement conditions.}}
-All experiments use the DomainNet dataset~\cite{peng2019domainnet}, which spans six visually
-distinct domains: real photograph, painting, clipart, quickdraw, infograph, and sketch.
-Images are resized to $224 \times 224$ pixels in 8-bit RGB and normalised per-channel
-using ImageNet mean and standard deviation.
-This multi-domain structure enables evaluation of generalisation across severe appearance shifts.
+The detector is the composition $f_\theta(x_1, x_2) = \sigma\bigl(h_\psi(\phi_\theta(x_1), \phi_\theta(x_2))\bigr)$, where $\phi_\theta\colon\mathcal{X}\to\mathbb{R}^d$ is a shared encoder, $h_\psi$ is a fusion head, and $\sigma$ is the sigmoid. Two structural restrictions are placed on the model class. First, the encoder is $G$-invariant, so that $\phi_\theta(g\cdot x) = \phi_\theta(x)$ for all $g\in G$, which implies that all geometric variants of an image collapse to one embedding without augmentation. Second, the head is symmetric, $h_\psi(z_1, z_2) = h_\psi(z_2, z_1)$, so that the score does not depend on the order in which the two images are presented. Training freezes the encoder backbone and updates only the fusion head, which limits the source of variance to the head and to augmentation sampling and reflects a realistic compute budget on a single GPU with at most 48\,GB of VRAM.
 
-\paragraph{\textbf{5. Sample restrictions.}}
-Positive pairs consist of a source image $x$ and its transformed copy
-$(g \circ \mathrm{pi})(x)$, where $g \sim \mathrm{Uniform}(G)$ and $\mathrm{pi} \sim p_{\mathrm{photo}}$.
-Negative pairs are constructed from two independently sampled images drawn from the
-\emph{same} DomainNet domain, making them hard negatives with shared visual statistics.
-The evaluation set contains 1200 pairs in total: 100 positives and 100 negatives for each
-of the six domains, ensuring balanced coverage.
-
-\paragraph{\textbf{6. Model.}}
-The full model is $f_{\mathrm{theta}} : \mathcal{X} \times \mathcal{X} \to [0,1]$, decomposed as
-\begin{equation}
-  f_{\mathrm{theta}}(x_1, x_2) = \mathrm{sigma}\!\bigl(h_{\mathrm{psi}}(\mathrm{phi}_{\mathrm{theta}}(x_1),\, \mathrm{phi}_{\mathrm{theta}}(x_2))\bigr),
+The loss combines class-weighted binary cross-entropy with an $L^2$ contrastive regularizer,
+\begin{equation}\label{eq:loss}
+  \mathcal{L} \;=\; \mathcal{L}_{\mathrm{BCE}}(w_+, w_-) \;+\; \lambda\,\mathcal{L}_{\mathrm{contr}}^{L^2},
+  \qquad
+  \mathcal{L}_{\mathrm{contr}}^{L^2}(z_1, z_2, y)
+    = y\,\|z_1-z_2\|_2^2 + (1-y)\,\max\bigl(0, m - \|z_1-z_2\|_2\bigr)^2,
 \end{equation}
-where $\mathrm{phi}_{\mathrm{theta}} : \mathcal{X} \to \mathbb{R}^d$ is the encoder with shared weights,
-$h_{\mathrm{psi}}$ is the fusion module, and $\mathrm{sigma}$ denotes the sigmoid function.
-The siamese design ensures that both images are mapped to the same embedding space before comparison.
+with $z_i = \phi_\theta(x_i)$, contrastive margin $m > 0$, and BCE class weights $w_+, w_-$ that compensate for label imbalance inside a cross-batch pairing. Generalisation is estimated by stratified five-fold cross-validation over the DomainNet pool, with stratification by domain so that every fold contains all six domains; the decision threshold is selected on the validation fold by maximizing F1 and applied unchanged on the test fold. The external quality criteria are the false positive rate at the F1-maximizing threshold and Recall stratified by transformation class, both reported as mean and standard deviation across folds; the secondary criterion is F1 together with a t-SNE visualisation of embeddings on the full evaluation pool.
 
-\paragraph{\textbf{7. Class restrictions.}}
-The encoder $\mathrm{phi}_{\mathrm{theta}}$ must be $G$-equivariant with a $G$-invariant pooling step so that
-the resulting embedding satisfies $\mathrm{phi}_{\mathrm{theta}}(g \cdot x) = \mathrm{phi}_{\mathrm{theta}}(x)$ for all $g \in G$.
-This invariance guarantees that geometric variants of the same image collapse to identical embeddings
-without data augmentation.
-Additionally, the fusion module $h_{\mathrm{psi}}$ must be symmetric:
-$h_{\mathrm{psi}}(z_1, z_2) = h_{\mathrm{psi}}(z_2, z_1)$, ensuring that the plagiarism score does not depend
-on the ordering of the two inputs.
-
-\paragraph{\textbf{8. Loss / criterion.}}
-Training minimises the composite objective
-\begin{equation}
-  \mathcal{L} = \mathcal{L}_{\mathrm{BCE}} + \mathrm{lambda}\,\mathcal{L}_{\mathrm{contr}}^{L^2},
+The research hypothesis closes the statement. Let $\phi^G$ denote a $G$-invariant ViT trained without block-$G$ augmentation, and $\phi^{\mathrm{aug}}$ a non-equivariant ViT-Tiny/16 trained with block-$G$ augmentation. For every transformation class $T\subseteq G$ we test
+\begin{equation}\label{eq:hypothesis}
+  H_1: \quad
+  \mathrm{FPR}_T(\phi^G)\le \mathrm{FPR}_T(\phi^{\mathrm{aug}})
+  \quad\text{and}\quad
+  \mathrm{Recall}_T(\phi^G)\ge \mathrm{Recall}_T(\phi^{\mathrm{aug}}),
 \end{equation}
-where $\mathcal{L}_{\mathrm{BCE}}$ is weighted binary cross-entropy with $w_+ = 0.3$ and $w_- = 0.7$,
-and the contrastive regulariser is
-\begin{equation}
-  \mathcal{L}_{\mathrm{contr}}^{L^2}(z_1, z_2, y_{ij})
-    = y_{ij}\,\|z_1 - z_2\|_2^2
-      + (1 - y_{ij})\,\max\!\bigl(0,\, m - \|z_1 - z_2\|_2\bigr)^2.
+with at least one inequality strict on some $T$. The null hypothesis $H_0$ is the complementary statement that the differences in $\mathrm{FPR}_T$ and $\mathrm{Recall}_T$ do not exceed the cross-fold variability of $\phi^{\mathrm{aug}}$. Optimal parameters are obtained by
+\begin{equation}\label{eq:argmin}
+  \hat\theta = \arg\min_\theta\ \mathbb{E}_{(x_1, x_2, y)\sim\mathcal{D}}\,\mathcal{L}(\theta),
 \end{equation}
-Setting $\mathrm{lambda} = 0$ recovers the variant trained without contrastive regularisation, which serves
-as a baseline to isolate the contribution of the geometric loss term.
-
-\paragraph{\textbf{9. Cross-validation procedure.}}
-Generalisation is estimated via stratified five-fold cross-validation over the DomainNet evaluation
-pool, with stratification by domain to ensure that every fold contains examples from all six domains.
-Hyper-parameters are selected on the validation fold, and test metrics are averaged across folds.
-This procedure is applied identically to all encoder configurations to ensure comparability.
-
-\paragraph{\textbf{10. Solution restrictions.}}
-All experiments are conducted on a single GPU with at most 48\,GB of VRAM, and fine-tuning is
-limited to at most 30 epochs.
-The encoder backbone $\mathrm{phi}_{\mathrm{theta}}$ is frozen throughout training; only the fusion head $h_{\mathrm{psi}}$
-is updated.
-These constraints reflect a realistic resource budget and ensure that differences in performance
-reflect architectural choices rather than training cost.
-
-\paragraph{\textbf{11. External quality criteria.}}
-The primary metrics are \textbf{FPR} (false positive rate at the threshold that maximises F1 on the
-validation fold) and \textbf{Recall} reported per transformation class: colour jitter (CJ),
-Gaussian noise (GN), Gaussian blur (GS), rotation by $90^\circ$ (R90), $180^\circ$ (R180),
-$270^\circ$ (R270), watermark (WM), and combinations thereof.
-Secondary metrics are F1 score and t-SNE separability of embeddings $z$ on DomainNet.
-Stratified recall directly measures whether a given encoder is robust to specific transformation types.
-
-\paragraph{\textbf{12. Argmin.}}
-The optimal encoder and fusion parameters are given by
-\begin{equation}
-  \hat{\mathrm{theta}} = \arg\min_{\mathrm{theta}}\;
-    \mathbb{E}_{(x_1,\, x_2,\, y_{i})\,\sim\,\mathcal{D}}\,
-    \mathcal{L}(\mathrm{theta}).
-\end{equation}
-In practice, this expectation is approximated by the empirical mean over mini-batches,
-and $\hat{\mathrm{theta}}$ is taken as the checkpoint with the lowest validation loss across the
-five cross-validation folds.
+approximated by mini-batch stochastic optimization, and the returned checkpoint is the one with lowest validation loss across the five cross-validation folds.
 
 \section{Preliminaries: Equivariance}\label{sec:prelim}
 
-\subsection{Group Actions and Representations}
+A left action of a group $G$ on a set $\mathcal{X}$ is a map $G\times\mathcal{X}\to\mathcal{X}$, $(g, x)\mapsto g\cdot x$, satisfying $e\cdot x = x$ and $(gh)\cdot x = g\cdot(h\cdot x)$ for all $g, h\in G$ and all $x\in\mathcal{X}$. A linear representation of $G$ on a vector space $V$ is a homomorphism $\rho\colon G\to\mathrm{GL}(V)$, so that group multiplication is preserved by $\rho(gh) = \rho(g)\rho(h)$. A map $\phi\colon\mathcal{X}\to\mathbb{R}^d$ is $G$-equivariant with respect to representations $\rho_{\mathcal{X}}$ on $\mathcal{X}$ and $\rho$ on $\mathbb{R}^d$ if $\phi(\rho_{\mathcal{X}}(g)\,x) = \rho(g)\,\phi(x)$ for every $g\in G$ and every $x\in\mathcal{X}$, and it is $G$-invariant when $\rho$ is the trivial representation, that is, when $\phi(g\cdot x) = \phi(x)$. For plagiarism detection, $G$-invariance of the encoder $\phi_\theta$ implies that all geometric variants of an image collapse to a single embedding without augmentation, so the head receives identical inputs whether or not a $g\in G$ has been applied; the detection problem reduces to comparing two points whose distance no longer depends on the geometric component of the perturbation.
 
-\begin{definition}[Group action]
-A \emph{left action} of a group $G$ on a set $\mathcal{X}$ is a map
-$G \times \mathcal{X} \to \mathcal{X}$,
-$(g, x) \mapsto g \cdot x$,
-satisfying $e \cdot x = x$ and $(gh) \cdot x = g \cdot (h \cdot x)$
-for all $g, h \in G$, $x \in \mathcal{X}$.
-\end{definition}
+Schur's lemma states that any $G$-equivariant linear map between irreducible representations is either zero or an isomorphism, and a direct consequence is that equivariant linear maps between fully decomposed representations are block-diagonal across the irreducible decomposition: each block acts within one irreducible component and cannot mix distinct irreducible types. The Octic ViT~\citep{nordstrom2025octic} relies on this property, since each transformer layer operates independently on each irreducible component of $D_4$, so the block-diagonal structure holds by construction and the parameter count drops without loss of expressivity inside each isotypic component.
 
-\begin{definition}[Group representation]
-A \emph{(linear) representation} of $G$ on a vector space $V$ is a group homomorphism
-$\mathrm{rho} \colon G \to \mathrm{GL}(V)$.
-\end{definition}
-
-A representation makes concrete how $G$ acts on a feature space: each group element $g$ is assigned an invertible linear map $\mathrm{rho}(g)$ on $V$, and group multiplication is preserved by $\mathrm{rho}(gh) = \mathrm{rho}(g)\mathrm{rho}(h)$.
-
-\subsection{Equivariance and Invariance}
-
-\begin{definition}[$G$-Equivariance]
-A map $\mathrm{phi} \colon \mathcal{X} \to \mathcal{Y}$ is \emph{$G$-equivariant} with respect to
-representations $\mathrm{rho}_\mathcal{X}$ on $\mathcal{X}$ and $\mathrm{rho}_\mathcal{Y}$ on $\mathcal{Y}$ if
-\[
-  \mathrm{phi}\bigl(\mathrm{rho}_\mathcal{X}(g) \cdot x\bigr) = \mathrm{rho}_\mathcal{Y}(g) \cdot \mathrm{phi}(x)
-  \quad \forall\, g \in G,\; x \in \mathcal{X}.
-\]
-\end{definition}
-
-\begin{definition}[$G$-Invariance]
-$\mathrm{phi}$ is \emph{$G$-invariant} if $\mathrm{rho}_\mathcal{Y}$ is the trivial representation:
-$\mathrm{phi}(\mathrm{rho}_\mathcal{X}(g) \cdot x) = \mathrm{phi}(x)$ for all $g \in G$.
-\end{definition}
-
-Invariance is thus a special case of equivariance in which the output space carries only the trivial action of $G$.
-For plagiarism detection, a $G$-invariant encoder $\mathrm{phi}_{\mathrm{theta}}$ satisfies $\mathrm{phi}_{\mathrm{theta}}(g \cdot x) = \mathrm{phi}_{\mathrm{theta}}(x)$ for every $g \in G$, so embeddings are identical regardless of which group element was applied to the source image.
-This removes the need for group-specific augmentation at training time and yields an exact invariance guarantee at inference time.
-
-\subsection{Irreducible Representations and Schur's Lemma}
-
-\begin{lemma}[Schur]
-Let $\mathrm{rho}_1 \colon G \to \mathrm{GL}(V_1)$ and $\mathrm{rho}_2 \colon G \to \mathrm{GL}(V_2)$ be
-irreducible representations of a group $G$.
-Any $G$-equivariant linear map $\mathrm{phi} \colon V_1 \to V_2$ is either the zero map or
-an isomorphism.
-\end{lemma}
-
-A consequence of Schur's lemma is that $G$-equivariant linear maps between fully decomposed representations are block-diagonal with respect to the irreducible decomposition: each block acts within one irreducible component and cannot mix distinct irreducible types.
-This constraint shrinks the parameter space of equivariant layers relative to unconstrained linear maps, and it motivates the architecture of Octic ViT~\cite{nordstrom2025octic}, where each transformer layer operates independently on each irreducible component of $D_4$ so the block-diagonal structure holds by construction.
-
-\subsection{Symmetry Groups in This Work}
-
-\paragraph{The dihedral group $D_4$.}
-$D_4 = \langle r, s \mid r^4 = s^2 = e,\; srs = r^{-1} \rangle$ is the symmetry group of the square, of order~8.
-It acts on images by rotating and reflecting the spatial axes by multiples of $90^\circ$.
-$D_4$ has five irreducible representations over $\mathbb{R}$: four one-dimensional ($A_1, A_2, B_1, B_2$) and one two-dimensional ($E$); any $D_4$-representation decomposes as $V \cong \bigoplus_i n_i V_i$ over these five types.
-
-\paragraph{The discrete translation group $\mathbb{Z}^2$.}
-The group $(\mathbb{Z}^2, +)$ acts on an $H \times W$ image by cyclic pixel shifts:
-$(t_{a,b} \cdot x)[i, j, c] = x[(i + a) \bmod H,\; (j + b) \bmod W,\; c]$.
-This action is relevant when plagiarists crop and re-centre images.
-In contrast to $D_4$, the group $\mathbb{Z}^2$ is infinite (or large-but-finite on discrete images), and exact equivariance is harder to enforce in the ViT patch-based setting.
-
-\paragraph{The special Euclidean group $SE(2)$.}
-$SE(2) = SO(2) \ltimes \mathbb{R}^2$ is the group of rigid motions of the plane: an element $(R_{\mathrm{alpha}}, t)$ rotates spatial coordinates by angle $\mathrm{alpha}$ and translates by $t \in \mathbb{R}^2$.
-Because $D_4$ covers only multiples of $90^\circ$ while $SE(2)$ admits arbitrary rotation angles, $SE(2)$-equivariance is more general but also harder to realise exactly on a discrete pixel grid.
+Two groups appear in the experiment. The dihedral group $D_4 = \langle r, s \mid r^4 = s^2 = e,\ srs = r^{-1}\rangle$ is the symmetry group of the square, of order eight, and acts on images by rotating and reflecting the spatial axes by multiples of $90^\circ$; over the reals it has five irreducible representations, four one-dimensional and one two-dimensional, and any $D_4$-representation decomposes as a direct sum across these five types. The special Euclidean group $SE(2) = SO(2) \ltimes \mathbb{R}^2$ is the group of rigid motions of the plane: an element rotates spatial coordinates by an angle $\alpha$ and translates by a vector in $\mathbb{R}^2$. Because $D_4$ covers only multiples of $90^\circ$ while $SE(2)$ admits arbitrary rotation angles, $SE(2)$-equivariance is strictly more general but also harder to realise exactly on a discrete pixel grid, which is the trade-off encoded in the comparison between Octic ViT and Harmformer.
 
 \section{Method}\label{sec:method}
 
-\subsection{Siamese Framework}
+\subsection{Siamese pipeline}
 
-The detector follows the siamese architecture of Bromley et al.~\cite{bromley1993signature}. Two branches share one encoder $\mathrm{phi}_{\mathrm{theta}}$ and process the query image $x_1$ and the candidate image $x_2$ in parallel to produce embeddings $z_1 = \mathrm{phi}_{\mathrm{theta}}(x_1)$ and $z_2 = \mathrm{phi}_{\mathrm{theta}}(x_2)$. A fusion module $h_{\mathrm{psi}}$ combines them into a scalar score, and a sigmoid maps the score to a plagiarism probability. The full model (already introduced in \S\ref{sec:problem}) is
-\begin{equation}
-  f_{\mathrm{theta}}(x_1, x_2) = \mathrm{sigma}\!\bigl(h_{\mathrm{psi}}(\mathrm{phi}_{\mathrm{theta}}(x_1),\, \mathrm{phi}_{\mathrm{theta}}(x_2))\bigr).
-\end{equation}
-Weight sharing maps $x_1$ and $x_2$ into the same feature space; without it the two branches would produce vectors in unrelated coordinate systems and any pairwise comparison would be ill-defined.
+The detector follows the siamese template of~\citet{bromley1993signature}. Two branches share one encoder $\phi_\theta$ and process the query image $x_1$ and the candidate image $x_2$ in parallel to produce embeddings $z_1 = \phi_\theta(x_1)$ and $z_2 = \phi_\theta(x_2)$ in $\mathbb{R}^d$. A fusion module $h_\psi$ collapses the pair into a scalar, and a sigmoid maps it to a plagiarism probability. Weight sharing places $z_1$ and $z_2$ in the same coordinate system, which is the precondition for any pairwise comparison: without it, the two branches would produce vectors in unrelated coordinate systems and the head could only learn an arbitrary alignment.
 
 \subsection{Encoders}
 
-\paragraph{ViT-L/16 (augmented).}
-The baseline encoder is a standard ViT-L/16~\cite{dosovitskiy2021image}. Each $224 \times 224$ input is split into $14 \times 14 = 196$ non-overlapping $16 \times 16$ patches; each patch is linearly projected to $\mathbb{R}^{1024}$, and the resulting sequence, together with a prepended \texttt{[CLS]} token, is passed through 24 transformer blocks with multi-head self-attention. The \texttt{[CLS]} token after the final layer norm is taken as the image embedding $z \in \mathbb{R}^{1024}$. This encoder has no equivariance guarantee. At training time it receives both photometric augmentations (block P) and geometric augmentations (block G); see \S\ref{sec:aug}.
+The non-equivariant reference is a ViT-Tiny/16~\citep{dosovitskiy2021image}. A $224\times 224$ input is split into $14\times 14 = 196$ non-overlapping $16\times 16$ patches, each linearly projected to $\mathbb{R}^{192}$, and the resulting sequence with a prepended \texttt{[CLS]} token is processed by twelve transformer blocks with multi-head self-attention. The \texttt{[CLS]} embedding after the final layer norm is taken as the image representation $z\in\mathbb{R}^{192}$. The encoder has no equivariance guarantee, and at training time it receives both the photometric block and a group-specific geometric block matched to the comparison in which it participates.
 
-\paragraph{ViT-L/16 (baseline).}
-Architecturally identical to ViT-L/16 (augmented), but trained with block P only; block G geometric transforms are withheld. This is the key ablation: if the augmentation-free variant matches the equivariant encoders, then geometric augmentation alone suffices and architectural inductive bias adds nothing beyond what augmentation already provides.
-
-\paragraph{Octic ViT ($D_4$-equivariant).}
-Nordstr\"{o}m et al.~\cite{nordstrom2025octic} replace each ViT layer with a $D_4$-equivariant variant. By Schur's lemma (\S\ref{sec:prelim}), equivariant linear maps act independently on each irreducible component, so the embedding space decomposes as
-\begin{equation}
+The Octic ViT~\citep{nordstrom2025octic} replaces each transformer layer with a $D_4$-equivariant variant. By Schur's lemma the embedding space decomposes across the irreducibles of $D_4$,
+\begin{equation}\label{eq:octic-decomp}
   \mathbb{R}^d \;\cong\;
-  \underbrace{(\mathbb{R}^{d/8})_{A_1} \oplus (\mathbb{R}^{d/8})_{A_2}
-              \oplus (\mathbb{R}^{d/8})_{B_1} \oplus (\mathbb{R}^{d/8})_{B_2}}_{\text{four 1-dim irreps}}
-  \oplus
-  \underbrace{(\mathbb{R}^{d/4})_E}_{\text{one 2-dim irrep}}.
+  (\mathbb{R}^{d/8})_{A_1}\oplus(\mathbb{R}^{d/8})_{A_2}\oplus(\mathbb{R}^{d/8})_{B_1}\oplus(\mathbb{R}^{d/8})_{B_2}
+  \;\oplus\;(\mathbb{R}^{d/4})_{E},
 \end{equation}
-Invariant pooling projects onto the trivial component $A_1$ to give a $D_4$-invariant output $z$. Trained with block P only.
+into four one-dimensional isotypic components and one two-dimensional component. $D_4$-invariant pooling projects onto the trivial isotypic component $A_1$ to produce a $D_4$-invariant output, and the encoder is trained with the photometric block only.
 
-\paragraph{Shift-Equivariant ViT ($\mathbb{Z}^2$-equivariant).}
-Rojas-Gomez et al.~\cite{rojasgomez2024shift} enforce exact cyclic shift-equivariance by replacing four ViT modules with adaptive polyphase variants: an A-token module (per-sample polyphase offset selection), A-WSA (adaptive window self-attention partition), A-PMerge (polyphase downsampling), and A-RPE (circular relative position encoding). The four modifications yield exact shift-equivariance without introducing extra learnable parameters. Trained with block P only.
+Harmformer~\citep{karella2024harmformer} replaces patch embeddings with circular harmonic filters that act as steerable feature maps and combines them with self-attention to obtain equivariance under continuous roto-translations. Where the Octic ViT is restricted to multiples of $90^\circ$, Harmformer covers arbitrary rotation angles in $SE(2)$, and the stronger guarantee comes at a higher computational cost per layer. Like the Octic ViT, Harmformer is trained with the photometric block only.
 
-\paragraph{Harmformer ($SE(2)$-equivariant).}
-Karella et al.~\cite{karella2024harmformer} combine circular harmonic filters (steerable feature maps) with transformer self-attention blocks to obtain equivariance under continuous roto-translations. Compared with Octic ViT, which is restricted to $90^\circ$ multiples of the dihedral group, Harmformer covers arbitrary rotation angles; the stronger guarantee comes at a higher computational cost. Trained with block P only.
+\subsection{Fusion head}
 
-All encoders are pre-trained on ImageNet-1K using the DINOv2~\cite{oquab2024dinov2} self-supervised recipe.
+The head takes $z_1, z_2 \in \mathbb{R}^d$ and returns a logit through pair features and a two-layer MLP. Set $\delta = |z_1 - z_2|$ for the element-wise absolute difference, $p = z_1\odot z_2$ for the element-wise product, and $v = [u_\delta(\delta);\, u_p(p)]\in\mathbb{R}^{2d}$ for the concatenation after independent linear maps; the head value is then $h_\psi(z_1, z_2) = c^\top \mathrm{ReLU}(A v + b)$. Since $|z_1 - z_2| = |z_2 - z_1|$ and $z_1\odot z_2 = z_2\odot z_1$, the vector $v$ is unchanged under transposition of the inputs, hence the head is symmetric in its two arguments.
 
-\subsection{Fusion Module}
-
-The fusion module combines two embeddings $z_1, z_2 \in \mathbb{R}^d$ into a scalar via a two-layer MLP applied to element-wise features:
-\begin{equation}
-  h_{\mathrm{psi}}(z_1, z_2) = W_2\,\mathrm{ReLU}\!\bigl(W_1\,[|z_1 - z_2|\;\|\;z_1 \odot z_2] + b_1\bigr) + b_2,
-\end{equation}
-where $|\cdot|$ denotes element-wise absolute value, $\odot$ element-wise product, and $[\cdot\|\cdot]$ concatenation.
-
-\begin{proposition}[Symmetry of the fusion module]
-$h_{\mathrm{psi}}(z_1, z_2) = h_{\mathrm{psi}}(z_2, z_1)$.
+\begin{proposition}[Symmetry of the head]\label{prop:head-sym}
+$h_\psi(z_1, z_2) = h_\psi(z_2, z_1)$ for all $z_1, z_2\in\mathbb{R}^d$.
 \end{proposition}
-\begin{proof}
-$|z_1 - z_2| = |z_2 - z_1|$ and $z_1 \odot z_2 = z_2 \odot z_1$;
-therefore the concatenated input to the MLP is the same under transposition.
-\end{proof}
 
-\subsection{$L^2$ Contrastive Regularizer}
+\subsection{$L^2$ contrastive regularizer}
 
-The contrastive regularizer (introduced in \S\ref{sec:problem}) is
-\begin{equation}
-  \mathcal{L}_\mathrm{contr}^{L^2}(z_1, z_2, y_{ij})
-    = y_{ij}\,\|z_1 - z_2\|_2^2
-      + (1 - y_{ij})\,\max\!\bigl(0,\, m - \|z_1 - z_2\|_2\bigr)^2.
-\end{equation}
+We use the regularizer in~\eqref{eq:loss}, with $L^2$ distance rather than cosine similarity. Working with $L^2$ distance is deliberate: its value is preserved by any orthogonal change of basis on $\mathbb{R}^d$, since $\|U z_1 - U z_2\|_2 = \|U(z_1 - z_2)\|_2 = \|z_1 - z_2\|_2$ for every orthogonal $U$, while cosine similarity depends on individual norms, which an isometry need not preserve. The practical consequence is that two $G$-invariant encoders that differ only by an orthogonal change of basis on the embedding space yield identical loss values on the same pair, so the regularizer does not penalize one rotation of the embedding frame over another.
 
-We use $L^2$ distance rather than cosine similarity because it is better aligned with the group-invariant geometry of the embedding space. Following Hadsell et al.~\cite{hadsell2006dimensionality}, the quantity $\|z_1 - z_2\|_2$ is an \emph{isometric invariant}: it is preserved by any orthogonal transformation of $\mathbb{R}^d$. This matches $G$-invariant encoders that may differ only by an isometry of the embedding space. Cosine similarity, in contrast, depends on vector norms, so it is not preserved by general orthogonal maps.
-
-\begin{proposition}[Isometry invariance of $\mathcal{L}_\mathrm{contr}^{L^2}$]
-Let $U \colon \mathbb{R}^d \to \mathbb{R}^d$ be an orthogonal map.
-Then $\mathcal{L}_\mathrm{contr}^{L^2}(Uz_1, Uz_2, y_{ij}) = \mathcal{L}_\mathrm{contr}^{L^2}(z_1, z_2, y_{ij})$.
+\begin{proposition}[Isometry invariance of the regularizer]\label{prop:iso-loss}
+For every orthogonal $U\colon\mathbb{R}^d\to\mathbb{R}^d$ and every $(z_1, z_2, y)$,
+$\mathcal{L}_{\mathrm{contr}}^{L^2}(U z_1, U z_2, y) = \mathcal{L}_{\mathrm{contr}}^{L^2}(z_1, z_2, y)$.
 \end{proposition}
-\begin{proof}
-$\|Uz_1 - Uz_2\|_2 = \|U(z_1 - z_2)\|_2 = \|z_1 - z_2\|_2$,
-since orthogonal maps preserve the $L^2$ norm.
-\end{proof}
 
-For each encoder we compare two conditions: $\mathrm{lambda} > 0$ (with $L^2$ regularizer) and $\mathrm{lambda} = 0$ (without).
+\subsection{Augmentation blocks}\label{sec:aug}
 
-\subsection{Augmentation Blocks}\label{sec:aug}
+The photometric block is shared across all encoders and all runs and is sampled independently for each pair. It applies, with probability $p = 0.3$ each, ColorJitter on brightness, contrast, saturation, and hue; Gaussian Blur with a small kernel; additive Gaussian Noise; JPEG re-compression at random quality; and a watermark overlay that mimics text-and-logo edits common in image piracy. The geometric block is added only to the ViT-Tiny/16 baseline and is matched to the symmetry group of the comparison: in the $D_4$ comparison it samples rotations from $\{90^\circ, 180^\circ, 270^\circ\}$ together with horizontal and vertical flips, and in the $SE(2)$ comparison it adds random crop and isotropic scale on top of the same set of rotations and flips. Equivariant encoders return identical embeddings under any element of the corresponding group, so applying the geometric block to them generates pairs with zero gradient on the head: harmless but redundant. The experimental claim is therefore that the geometric block can be dropped for $\phi^G$ without loss of detection performance.
 
-Block P (photometric augmentations) is applied to all encoders during training:
+\subsection{Invariance propagation}
 
-\medskip
-\noindent
-\begin{tabular}{@{}ll@{}}
-\toprule
-\textbf{Transform} & \textbf{Parameters} \\
-\midrule
-ColorJitter & brightness=0.2, contrast=0.2, saturation=0.1, hue=0.05 \\
-RandomGrayscale & $p=0.05$ \\
-GaussianBlur & kernel=3, $p=0.1$ \\
-ImageNet normalization & $\mathrm{mu}=(0.485,0.456,0.406)$, $\mathrm{sigma}=(0.229,0.224,0.225)$ \\
-\bottomrule
-\end{tabular}
+The two structural choices on the encoder and the head combine into a single property of the detector: the score is invariant under any element of $G$ applied jointly to both inputs. If $\phi_\theta$ is $G$-invariant, then $\phi_\theta(g\cdot x_i) = \phi_\theta(x_i)$ for $i = 1, 2$, and since $h_\psi$ and $\sigma$ are deterministic functions of their inputs, $f_\theta(g\cdot x_1, g\cdot x_2) = f_\theta(x_1, x_2)$ for every $g\in G$ and every pair $(x_1, x_2)$. The plagiarism score is therefore the same whether or not $g$ has been applied, which is the invariance required for geometric plagiarism detection.
 
-\medskip
-Block G (geometric augmentations) is applied only to ViT-L/16 (augmented):
-
-\medskip
-\noindent
-\begin{tabular}{@{}ll@{}}
-\toprule
-\textbf{Transform} & \textbf{Parameters} \\
-\midrule
-RandomHorizontalFlip & $p=0.5$ \\
-RandomVerticalFlip & $p=0.5$ \\
-RandomChoice of rotation & $\{0^\circ, 90^\circ, 180^\circ, 270^\circ\}$ \\
-RandomResizedCrop & scale=$(0.7,1.0)$, ratio=$(0.9,1.1)$ \\
-\bottomrule
-\end{tabular}
-
-\medskip
-Equivariant encoders by design produce the same embedding for any $g \in G$ applied to the input, so block G augmentation on those encoders generates pairs with zero gradient for the head: harmless but redundant. The experimental hypothesis is therefore that block G can be dropped for equivariant encoders without degrading detection performance.
-
-\subsection{Theoretical Properties: Invariance Propagation}
-
-\begin{proposition}[Invariance propagation]
-If $\mathrm{phi}_{\mathrm{theta}}$ is $G$-invariant, then $f_{\mathrm{theta}}(g \cdot x_1, g \cdot x_2) = f_{\mathrm{theta}}(x_1, x_2)$
-for all $g \in G$ and all $x_1, x_2 \in \mathcal{X}$.
+\begin{proposition}[Joint invariance]\label{prop:joint}
+If $\phi_\theta$ is $G$-invariant, then $f_\theta(g\cdot x_1, g\cdot x_2) = f_\theta(x_1, x_2)$ for all $g\in G$ and all $x_1, x_2\in\mathcal{X}$.
 \end{proposition}
-\begin{proof}
-$G$-invariance of $\mathrm{phi}_{\mathrm{theta}}$ gives $\mathrm{phi}_{\mathrm{theta}}(g \cdot x_i) = \mathrm{phi}_{\mathrm{theta}}(x_i)$ for $i = 1, 2$.
-Since $h_{\mathrm{psi}}$ and $\mathrm{sigma}$ are deterministic functions of their inputs, the output of $f_{\mathrm{theta}}$ is unchanged.
-\end{proof}
 
-The plagiarism score is thus the same for every $g \in G$ applied jointly to both inputs, which is the invariance required for geometric plagiarism detection.
+\section{Computational Experiment}\label{sec:exp}
 
-\section{Experiments}\label{sec:exp}
+The goal of the experiment is to test, for each $G\in\{D_4, SE(2)\}$, whether a $G$-invariant encoder trained without block-$G$ augmentation matches or exceeds a ViT-Tiny/16 baseline trained with block-$G$ augmentation on FPR and per-class Recall. Training pairs are constructed on COCO\,2017 with the cross-batch protocol of~\citet{dorin2024pairwise}: a batch of $B$ images is augmented to two views per image, applying the photometric block to all encoders and adding the geometric block on top for the augmented ViT-Tiny/16 baseline, all $B^2$ ordered pairs are formed with labels $y_{ij} = \mathbbm{1}[i = j]$, embeddings are computed through the frozen encoder and the fusion module, the composite loss in~\eqref{eq:loss} is evaluated, and AdamW updates the fusion parameters under a multi-step learning-rate schedule with class-weighted binary cross-entropy and a fixed contrastive margin.
 
-\subsection{Dataset and Pre-training}
+Evaluation uses the DomainNet benchmark~\citep{peng2019domainnet}, which spans six visually diverse domains: real, painting, clipart, quickdraw, infograph, and sketch. We construct a balanced test set of 1\,200 pairs as 100 positive and 100 negative pairs per domain. A positive pair is a source image together with $(g\circ\eta)(x)$, with $g$ drawn uniformly from the symmetry group of the comparison and $\eta$ from the photometric mixture; a negative pair is two distinct images drawn from the same domain, which produces hard negatives with shared visual statistics. The protocol enables stratified evaluation by transformation class and by domain.
 
-All encoders are pre-trained on COCO2017 with the DINOv2~\cite{oquab2024dinov2} self-supervised recipe.
-Pre-training is done separately per encoder architecture when DINOv2-compatible weights exist; for architectures without publicly available DINOv2 checkpoints, we initialize from a ViT-L/16 DINOv2 checkpoint and adapt the weights.
-
-Evaluation uses the DomainNet benchmark~\cite{peng2019domainnet}, which contains images from six visually diverse domains: real photograph, painting, clipart, quickdraw, infograph, and sketch.
-We build a balanced test set of 1200 pairs: 100 positive and 100 negative pairs per domain (600 positives and 600 negatives in total).
-Each image is resized to $224 \times 224$ pixels, giving $3 \times 224 \times 224 = 150{,}528$ scalar features per image.
-A positive pair is a source image together with a transformed copy; a negative pair is two distinct images drawn from the same domain (hard negatives).
-
-\subsection{Training Pipeline}
-
-The experiment consists of 10 training runs: 5 encoders $\times$ \{$\mathrm{lambda} = 0$ (without $L^2$ regulariser), $\mathrm{lambda} > 0$ (with $L^2$ regulariser)\}.
-
-In each run we load base images from the training split and build pairs via the cross-batch strategy of Dorin et al.~\cite{dorin2024pairwise}: a batch of $B$ images is augmented to form two views per image (block P for all encoders, and additionally block G for ViT-L/16 augmented), and all $B^2$ pairwise combinations are formed with labels $y_{ij} = \mathbb{1}[i = j]$.
-Embeddings are computed through the frozen encoder and the fusion module, the composite loss $\mathcal{L}$ is evaluated, and AdamW updates the fusion parameters $\mathrm{psi}$.
-Hyperparameters are listed in Table~\ref{tab:hyperparams}.
+The experiment comprises four training runs grouped into two per-group comparisons. In the first comparison, $G = D_4$, a ViT-Tiny/16 trained with the photometric block plus rotations from $\{90^\circ, 180^\circ, 270^\circ\}$ and the two flips is compared against the Octic ViT trained with the photometric block only. In the second comparison, $G = SE(2)$, a ViT-Tiny/16 trained with the photometric block plus the same rotations and flips together with random crop and isotropic scale is compared against Harmformer trained with the photometric block only. The schema is summarized in Table~\ref{tab:runs-schema}; metric cells are filled after the runs complete.
 
 \begin{table}[h]
 \centering
-\caption{Training hyperparameters.}
-\label{tab:hyperparams}
-\begin{tabular}{ll}
+\small
+\caption{Run schema. Group augmentations are applied only to ViT-Tiny/16; equivariant encoders see the photometric block only.}
+\label{tab:runs-schema}
+\begin{tabular}{@{}llcc@{}}
 \toprule
-Parameter & Value \\
+Encoder & Group augmentations on ViT-Tiny/16 & FPR & Recall \\
 \midrule
-Optimizer & AdamW \\
-Learning rate & $10^{-3}$ \\
-Weight decay & $10^{-2}$ \\
-LR scheduler & MultiStepLR, milestones $[5,10]$, $\mathrm{gamma}=0.5$ \\
-BCE weights & $w_+=0.3$, $w_-=0.7$ \\
-Epochs & 15 \\
-Contrastive margin $m$ & 1.0 \\
-Contrastive weight $\mathrm{lambda}$ (when enabled) & 0.1 \\
-Batch size $B$ & 32 \\
+\multicolumn{4}{@{}l}{\textit{Comparison 1: $G = D_4$}} \\
+\quad ViT-Tiny/16 + block~G$_{D_4}$ & R90/180/270, HFlip, VFlip & --- & --- \\
+\quad Octic ViT (no group augs)     & ---                       & --- & --- \\
+\midrule
+\multicolumn{4}{@{}l}{\textit{Comparison 2: $G = SE(2)$}} \\
+\quad ViT-Tiny/16 + block~G$_{SE(2)}$ & R90/180/270, HFlip, VFlip, Crop, Scale & --- & --- \\
+\quad Harmformer (no group augs)      & ---                                    & --- & --- \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Evaluation Protocol}
+For each run the fusion head is trained on the training split, the decision threshold is selected on the validation fold by maximizing F1, and final metrics are computed on the held-out test set. The primary metrics are FPR at the F1-maximizing threshold and Recall, both stratified by transformation class, with full ROC and PR curves and AUC reported per comparison. Stratified Recall directly probes the equivariance hypothesis: a $G$-invariant encoder is expected to be approximately flat across orbit elements of $G$, while an augmentation-only baseline can dip between orbit points whose specific transformation was under-sampled at training time. Code, configuration files, and DomainNet pair lists are released at \url{https://github.com/intsystems/2026-Project-198}.
 
-For each (encoder, $\pm L^2$) run, we train on the training split, pick a decision threshold on the validation fold by maximising F1, and then compute final metrics on the held-out test set.
-
-Primary metrics are false positive rate (FPR) and Recall, both stratified by transformation class: ColorJitter (CJ), Gaussian Noise (GN), Grayscale (GS), R90, R180, R270, Watermark (WM), and their pairwise combinations.
-FPR is reported for comparability with Dorin et al.~\cite{dorin2024pairwise}.
-Secondary metrics include the F1 score and a t-SNE visualisation of encoder embeddings on the full DomainNet evaluation set, with the six domains shown as distinct point colours.
-
-% \subsection{Code Organisation}
-
-% The implementation targets the following modular structure, with all hyperparameters centralised in a single configuration file:
-
-% \begin{itemize}
-%   \item \texttt{code/main.py}  -  single entry point for training and evaluation
-%   \item \texttt{code/encoders/}  -  encoder wrappers (ViT-L/16, Octic ViT, Shift-Equivariant ViT, Harmformer)
-%   \item \texttt{code/siamese/}  -  siamese network and fusion module
-%   \item \texttt{code/data/}  -  dataset loading and augmentation blocks P and G
-%   \item \texttt{code/train/}  -  training loop and loss computation
-%   \item \texttt{code/eval/}  -  evaluation, threshold selection, metric computation, t-SNE
-%   \item \texttt{code/config.yaml}  -  centralised hyperparameters (all values from Table~\ref{tab:hyperparams})
-% \end{itemize}
-
-% The current baseline lives in \texttt{code/image-plagiarism-detection-with-eq-encoders.ipynb}; it provides the reference hyperparameters and the cross-batch pairing strategy.
-
-% \subsection{Planned Figures and Tables}
-
-% All figures are to be produced in \texttt{.pdf} or \texttt{.eps} format at 300\,DPI, with fonts at 12-16\,pt and lines at 2\,pt width.
-
-\begin{itemize}
-  \item \textbf{Figure~1.} Siamese architecture schema: encoder branches, fusion module, sigmoid head.
-        (Axes: not applicable.)
-  \item \textbf{Figure~2.} Diagrams of $D_4$, $\mathbb{Z}^2$, $SE(2)$ with example actions on a sample image.
-        (Axes: spatial coordinates of the image under each transformation.)
-  \item \textbf{Figure~3} (source data plot). Distribution of DomainNet evaluation pairs.
-        $x$-axis: domain name; $y$-axis: pair count.
-  \item \textbf{Figure~4} (main message). FPR by encoder and regularisation condition.
-        $x$-axis: encoder name; $y$-axis: FPR; grouped bars: $\mathrm{lambda}=0$ vs.\ $\mathrm{lambda}>0$.
-  \item \textbf{Figure~5} (main message). Recall stratified by transformation class.
-        $x$-axis: transformation class (CJ, GN, GS, R90, R180, R270, WM, combos);
-        $y$-axis: Recall; bars grouped by encoder.
-  \item \textbf{Figure~6.} t-SNE of encoder embeddings on DomainNet.
-        Five subplots (one per encoder); point colours: six DomainNet domains.
-\end{itemize}
-
-In addition to Table~\ref{tab:comparison} (§\,\ref{sec:intro}) and Table~\ref{tab:hyperparams} (§\,\ref{sec:exp}):
-\begin{itemize}
-  \item \textbf{Table~3.} Main results: FPR for each (encoder, regularisation) run.
-  \item \textbf{Table~4.} Recall stratified by transformation class for each (encoder, regularisation) run.
-\end{itemize}
-
-\subsection{Results}\label{sec:results}
-
-% TODO: Fill after experimental runs (subproject~C).
-% Planned content: Table~3 (FPR), Table~4 (Recall by transformation),
-% Figure~4 (FPR grouped bars), Figure~5 (Recall grouped bars),
-% Figure~6 (t-SNE), and 2-3 paragraphs of analysis.
+Results are pending the training runs; the report will be filled in the camera-ready version. The reserved figures are a bar plot of FPR per encoder and augmentation regime, with grouped bars contrasting the configuration with and without the geometric block; a per-transformation Recall heatmap whose rows index encoders and whose columns index transformation classes, including pairwise combinations of the photometric and geometric perturbations; ROC and PR curves per comparison contrasting $\phi^G$ against $\phi^{\mathrm{aug}}$; and a Recall curve as a function of rotation angle $\alpha\in[0^\circ, 360^\circ]$ sampled on a $15^\circ$ grid, on which equivariant encoders are expected to be approximately flat while the augmented ViT-Tiny/16 may dip between $D_4$ orbit points if the augmentation distribution under-samples them. The error report will isolate three sources of variance: stratified errors per transformation class, with differences on R90, R180, R270 directly testing the $D_4$ hypothesis and continuous-angle Recall directly testing the $SE(2)$ hypothesis; cross-fold variance reported as mean and standard deviation over five stratified folds, used to check whether differences between encoders exceed the variability of the baseline; and a failure inspection of the top-$k$ false positives and false negatives per domain, with the applied transformation logged, to attribute residual errors to specific perturbations rather than to encoder choice as a whole.
 
 \section{Conclusion}\label{sec:concl}
-We presented a siamese plagiarism detector that benchmarks five encoder configurations
-spanning three symmetry groups, $D_4$ (Octic ViT), $\mathbb{Z}^2$ (Shift-Equivariant ViT),
-and $SE(2)$ (Harmformer), against a plain ViT-L/16 baseline.
-Fixing the DINOv2 pre-training protocol and varying only the geometric inductive bias and
-the presence of an $L^2$ contrastive regularizer lets the framework separate the
-contribution of built-in $G$-invariance from that of data augmentation across 10 runs.
-Section~\ref{sec:method} establishes three properties of the setup:
-symmetry of the fusion module, isometry invariance of the $L^2$ contrastive loss,
-and invariance propagation through the full siamese pipeline.
-Whether $G$-invariant encoders trained without block G augmentations
-match or exceed a ViT-L/16 trained with full augmentation is the empirical question
-left to the DomainNet evaluation.
 
-The experimental runs (\S\ref{sec:results}) will be completed in subproject C:
-implementing Shift-Equivariant ViT and Harmformer, pre-training all five encoders on
-ImageNet-1K, and executing the 10 siamese fine-tuning experiments.
-We will report FPR and Recall stratified by transformation class on the
-balanced DomainNet test set.
-We expect the equivariant encoders to support the inductive bias hypothesis:
-reduced reliance on geometric augmentation with detection performance preserved.
+We described a siamese plagiarism detector that wraps three encoders inside one pipeline and pits architectural $G$-invariance against geometric augmentation under matched conditions. The setup is fixed: a ViT-Tiny/16 baseline trained with the photometric block plus group-specific augmentations, an Octic ViT for $D_4$, and a Harmformer for $SE(2)$, each evaluated on a balanced cross-domain test of 1\,200 pairs from DomainNet. Three properties of the pipeline follow from the design without invoking the data, namely symmetry of the fusion head, isometry invariance of the $L^2$ contrastive regularizer, and joint invariance propagation through the full siamese score, and they together imply that the plagiarism probability is unchanged whenever a group element is applied jointly to both inputs. Whether $G$-invariant encoders trained without block-$G$ augmentation match or exceed an augmented ViT-Tiny/16 on FPR and Recall is the empirical question left to the DomainNet evaluation. Future work will widen the scope of the geometric component beyond $D_4$ and $SE(2)$ and extend the protocol from frozen backbones to end-to-end training of equivariant ViTs on plagiarism-specific data.
 
 \bibliographystyle{unsrtnat}
 \bibliography{references}

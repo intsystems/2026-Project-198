@@ -1,4 +1,4 @@
-\begin{thebibliography}{15}
+\begin{thebibliography}{13}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -25,25 +25,25 @@ Taco~S. Cohen and Max Welling.
 \newblock Group equivariant convolutional networks.
 \newblock In \emph{Proceedings of the 33rd International Conference on Machine Learning (ICML)}, volume~48 of \emph{JMLR: W\&CP}, pages 2990--2999, 2016.
 
+\bibitem[Weiler and Cesa(2019)]{weiler2019general}
+Maurice Weiler and Gabriele Cesa.
+\newblock General {E(2)}-equivariant steerable {CNN}s.
+\newblock In \emph{Advances in Neural Information Processing Systems (NeurIPS)}, volume~32, 2019.
+
 \bibitem[Nordstr{\"o}m et~al.(2025)Nordstr{\"o}m, Edstedt, Kahl, and B{\"o}kman]{nordstrom2025octic}
 David Nordstr{\"o}m, Johan Edstedt, Fredrik Kahl, and Georg B{\"o}kman.
 \newblock Octic vision transformers: Quicker vits through equivariance, 2025.
 \newblock URL \url{https://arxiv.org/abs/2505.15441}.
-
-\bibitem[Rojas-Gomez et~al.(2023)Rojas-Gomez, Lim, Do, and Yeh]{rojasgomez2024shift}
-Renan~A. Rojas-Gomez, Teck-Yian Lim, Minh~N. Do, and Raymond~A. Yeh.
-\newblock Making vision transformers truly shift-equivariant, 2023.
-\newblock URL \url{https://arxiv.org/abs/2305.16316}.
 
 \bibitem[Karella et~al.(2024)Karella, Harmanec, Kotera, Bla{\v{z}}ek, and {\v{S}}roubek]{karella2024harmformer}
 Tom{\'a}{\v{s}} Karella, Adam Harmanec, Jan Kotera, Jan Bla{\v{z}}ek, and Filip {\v{S}}roubek.
 \newblock Harmformer: Harmonic networks meet transformers for continuous roto-translation equivariance, 2024.
 \newblock URL \url{https://arxiv.org/abs/2411.03794}.
 
-\bibitem[Oquab et~al.(2024)Oquab, Darcet, Moutakanni, Vo, Szafraniec, Khalidov, Fernandez, Haziza, Massa, El-Nouby, et~al.]{oquab2024dinov2}
-Maxime Oquab, Timoth{\'e}e Darcet, Th{\'e}o Moutakanni, Huy Vo, Marc Szafraniec, Vasil Khalidov, Pierre Fernandez, Daniel Haziza, Francisco Massa, Alaaeldin El-Nouby, et~al.
-\newblock {DINOv2}: Learning robust visual features without supervision.
-\newblock \emph{Transactions on Machine Learning Research}, 2024.
+\bibitem[Bromley et~al.(1993)Bromley, Guyon, LeCun, S{\"a}ckinger, and Shah]{bromley1993signature}
+Jane Bromley, Isabelle Guyon, Yann LeCun, Eduard S{\"a}ckinger, and Roopak Shah.
+\newblock Signature verification using a ``{S}iamese'' time delay neural network.
+\newblock In \emph{Advances in Neural Information Processing Systems (NIPS)}, volume~6, 1993.
 
 \bibitem[Dorin et~al.(2024)Dorin, Varlamova, and Grabovoy]{dorin2024pairwise}
 Daniil Dorin, Kseniia Varlamova, and Andrey Grabovoy.
@@ -51,30 +51,20 @@ Daniil Dorin, Kseniia Varlamova, and Andrey Grabovoy.
 \newblock URL \url{https://github.com/DorinDaniil/Pairwise-Image-Matching}.
 \newblock Preprint; training protocol and augmentation details.
 
-\bibitem[Bromley et~al.(1993)Bromley, Guyon, LeCun, S{\"a}ckinger, and Shah]{bromley1993signature}
-Jane Bromley, Isabelle Guyon, Yann LeCun, Eduard S{\"a}ckinger, and Roopak Shah.
-\newblock Signature verification using a ``{S}iamese'' time delay neural network.
-\newblock In \emph{Advances in Neural Information Processing Systems (NIPS)}, volume~6, 1993.
-
 \bibitem[Ke et~al.(2004)Ke, Sukthankar, and Huston]{ke2004efficient}
 Yan Ke, Rahul Sukthankar, and Larry Huston.
 \newblock Efficient near-duplicate detection and sub-image retrieval.
 \newblock In \emph{Proceedings of the ACM International Conference on Multimedia}, pages 869--876, 2004.
 
-\bibitem[Weiler and Cesa(2019)]{weiler2019general}
-Maurice Weiler and Gabriele Cesa.
-\newblock General {E(2)}-equivariant steerable {CNN}s.
-\newblock In \emph{Advances in Neural Information Processing Systems (NeurIPS)}, volume~32, 2019.
+\bibitem[Hadsell et~al.(2006)Hadsell, Chopra, and LeCun]{hadsell2006dimensionality}
+Raia Hadsell, Sumit Chopra, and Yann LeCun.
+\newblock Dimensionality reduction by learning an invariant mapping.
+\newblock In \emph{Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, pages 1735--1742, 2006.
 
 \bibitem[Chopra et~al.(2005)Chopra, Hadsell, and LeCun]{chopra2005learning}
 Sumit Chopra, Raia Hadsell, and Yann LeCun.
 \newblock Learning a similarity metric discriminatively, with application to face verification.
 \newblock In \emph{Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, pages 539--546, 2005.
-
-\bibitem[Hadsell et~al.(2006)Hadsell, Chopra, and LeCun]{hadsell2006dimensionality}
-Raia Hadsell, Sumit Chopra, and Yann LeCun.
-\newblock Dimensionality reduction by learning an invariant mapping.
-\newblock In \emph{Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, pages 1735--1742, 2006.
 
 \bibitem[Peng et~al.(2019)Peng, Bai, Xia, Huang, Saenko, and Wang]{peng2019domainnet}
 Xingchao Peng, Qinxun Bai, Xide Xia, Zijun Huang, Kate Saenko, and Bo~Wang.
