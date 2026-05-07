@@ -5,18 +5,15 @@
 \citation{dosovitskiy2021image}
 \citation{chen2024spatialvlm}
 \citation{bronstein2021geometric,cohen2016group,weiler2019general}
+\citation{bromley1993signature}
+\citation{ke2004efficient}
+\citation{pizzi2022sscd,kim2025rdcd}
+\citation{pizzi2022sscd}
+\citation{kim2025rdcd}
 \citation{nordstrom2025octic}
 \citation{karella2024harmformer}
-\citation{bromley1993signature}
-\citation{dorin2024pairwise}
 \@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
 \newlabel{sec:intro}{{1}{1}{Introduction}{section.1}{}}
-\citation{dorin2024pairwise}
-\citation{ke2004efficient}
-\citation{nordstrom2025octic}
-\citation{karella2024harmformer}
-\citation{dorin2024pairwise}
-\citation{hadsell2006dimensionality,chopra2005learning}
 \citation{peng2019domainnet}
 \citation{dorin2024pairwise}
 \citation{bromley1993signature}
@@ -31,39 +28,53 @@
 \newlabel{sec:rw}{{2}{2}{Related Work}{section.2}{}}
 \citation{hadsell2006dimensionality}
 \citation{chopra2005learning}
-\citation{peng2019domainnet}
+\citation{nordstrom2025octic}
 \@writefile{toc}{\contentsline {section}{\numberline {3}Problem Statement}{3}{section.3}\protected@file@percent }
 \newlabel{sec:problem}{{3}{3}{Problem Statement}{section.3}{}}
-\newlabel{eq:loss}{{1}{3}{Problem Statement}{equation.1}{}}
-\newlabel{eq:hypothesis}{{2}{3}{Problem Statement}{equation.2}{}}
-\newlabel{eq:argmin}{{3}{3}{Problem Statement}{equation.3}{}}
-\citation{nordstrom2025octic}
+\newlabel{eq:d4-def}{{1}{3}{Problem Statement}{equation.1}{}}
+\newlabel{eq:se2-def}{{2}{3}{Problem Statement}{equation.2}{}}
+\newlabel{eq:photo-set}{{3}{3}{Problem Statement}{equation.3}{}}
+\newlabel{eq:hypothesis}{{4}{3}{Problem Statement}{equation.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Preliminaries: Equivariance}{3}{section.4}\protected@file@percent }
+\newlabel{sec:prelim}{{4}{3}{Preliminaries: Equivariance}{section.4}{}}
+\newlabel{lem:schur}{{1}{3}{Schur}{lemma.1}{}}
+\newlabel{eq:schur-intertwine}{{5}{3}{Schur}{equation.5}{}}
 \citation{bromley1993signature}
 \citation{dosovitskiy2021image}
 \citation{nordstrom2025octic}
-\@writefile{toc}{\contentsline {section}{\numberline {4}Preliminaries: Equivariance}{4}{section.4}\protected@file@percent }
-\newlabel{sec:prelim}{{4}{4}{Preliminaries: Equivariance}{section.4}{}}
+\citation{karella2024harmformer}
+\citation{dorin2024pairwise}
 \@writefile{toc}{\contentsline {section}{\numberline {5}Method}{4}{section.5}\protected@file@percent }
 \newlabel{sec:method}{{5}{4}{Method}{section.5}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Siamese pipeline}{4}{subsection.5.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Siamese pipeline with a $G$-invariant encoder. Both branches share the encoder $\phi _\theta $, the embeddings $z_1, z_2$ are passed to the symmetric fusion head $h_\psi $, and the sigmoid produces the plagiarism probability.}}{4}{figure.caption.2}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{fig:siamese-pipeline}{{1}{4}{Siamese pipeline with a $G$-invariant encoder. Both branches share the encoder $\phi _\theta $, the embeddings $z_1, z_2$ are passed to the symmetric fusion head $h_\psi $, and the sigmoid produces the plagiarism probability}{figure.caption.2}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Encoders}{4}{subsection.5.2}\protected@file@percent }
-\newlabel{eq:octic-decomp}{{4}{4}{Encoders}{equation.4}{}}
-\citation{karella2024harmformer}
-\citation{dorin2024pairwise}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Fusion head}{5}{subsection.5.3}\protected@file@percent }
-\newlabel{prop:head-sym}{{1}{5}{Symmetry of the head}{theorem.1}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}$L^2$ contrastive regularizer}{5}{subsection.5.4}\protected@file@percent }
-\newlabel{prop:iso-loss}{{2}{5}{Isometry invariance of the regularizer}{theorem.2}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Augmentation blocks}{5}{subsection.5.5}\protected@file@percent }
-\newlabel{sec:aug}{{5.5}{5}{Augmentation blocks}{subsection.5.5}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.6}Invariance propagation}{5}{subsection.5.6}\protected@file@percent }
-\newlabel{prop:joint}{{3}{5}{Joint invariance}{theorem.3}{}}
+\newlabel{eq:octic-decomp}{{6}{4}{Encoders}{equation.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Fusion head}{4}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Data sampling strategy}{5}{subsection.5.4}\protected@file@percent }
+\newlabel{sec:data-sampling}{{5.4}{5}{Data sampling strategy}{subsection.5.4}{}}
+\newlabel{eq:cross-batch-label}{{7}{5}{Data sampling strategy}{equation.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Loss function}{5}{subsection.5.5}\protected@file@percent }
+\newlabel{eq:loss-total}{{8}{5}{Loss function}{equation.8}{}}
+\newlabel{eq:loss-bce}{{9}{5}{Loss function}{equation.9}{}}
+\newlabel{eq:loss-contr}{{10}{5}{Loss function}{equation.10}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.6}Augmentation blocks}{5}{subsection.5.6}\protected@file@percent }
+\newlabel{sec:aug}{{5.6}{5}{Augmentation blocks}{subsection.5.6}{}}
 \citation{peng2019domainnet}
 \@writefile{toc}{\contentsline {section}{\numberline {6}Computational Experiment}{6}{section.6}\protected@file@percent }
 \newlabel{sec:exp}{{6}{6}{Computational Experiment}{section.6}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Run schema. Group augmentations are applied only to ViT-Tiny/16; equivariant encoders see the photometric block only.}}{6}{table.caption.2}\protected@file@percent }
-\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
-\newlabel{tab:runs-schema}{{1}{6}{Run schema. Group augmentations are applied only to ViT-Tiny/16; equivariant encoders see the photometric block only}{table.caption.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces \textbf  {Training parameters for the models.} Optimizer is AdamW with the listed learning rate and weight decay. It specifies contrastive loss parameters like the regularization parameter $\lambda $ and margin $m$, and includes general training parameters such as batch size $B$ and the number of epochs.}}{6}{table.caption.3}\protected@file@percent }
+\newlabel{tab:hparams}{{1}{6}{\textbf {Training parameters for the models.} Optimizer is AdamW with the listed learning rate and weight decay. It specifies contrastive loss parameters like the regularization parameter $\lambda $ and margin $m$, and includes general training parameters such as batch size $B$ and the number of epochs}{table.caption.3}{}}
+\@writefile{toc}{\contentsline {paragraph}{Test set construction.}{6}{section*.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Stratification by geometric transformation.}{6}{section*.5}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Geometric strata used for per-transformation $\mathrm  {FPR}$ and $\mathrm  {Recall}$.}}{6}{table.caption.6}\protected@file@percent }
+\newlabel{tab:geom-strata}{{2}{6}{Geometric strata used for per-transformation $\mathrm {FPR}$ and $\mathrm {Recall}$}{table.caption.6}{}}
+\@writefile{toc}{\contentsline {paragraph}{Results.}{6}{section*.8}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces \textbf  {Quantitative performance comparison on DomainNet test subsets across model architectures.} All metrics are evaluated at a fixed decision threshold of $\tau = 0.5$. The first two metric columns come from the overall regime (one $1\,200$-pair test with the training-time augmentation of each model on both branches): $\mathrm  {FPR}$ is the global false positive rate, $\mathrm  {Recall}$ is the global recall on the same set. The remaining columns come from the per-stratum regime (one $1\,200$-pair test per geometric stratum, photometric block off, only the stratum's geometric transform applied to the positive view). Stratum abbreviations: $R_{\alpha }$ -- rotation by $\alpha ^\circ $, $\mathrm  {HFlip}$ / $\mathrm  {VFlip}$ -- horizontal / vertical flip, $T_{0.2}$ -- random translation up to $\pm 20\%$ on each axis. Best $\mathrm  {FPR}$ in bold.}}{7}{table.caption.7}\protected@file@percent }
+\newlabel{tab:per-stratum}{{3}{7}{\textbf {Quantitative performance comparison on DomainNet test subsets across model architectures.} All metrics are evaluated at a fixed decision threshold of $\tau = 0.5$. The first two metric columns come from the overall regime (one $1\,200$-pair test with the training-time augmentation of each model on both branches): $\mathrm {FPR}$ is the global false positive rate, $\mathrm {Recall}$ is the global recall on the same set. The remaining columns come from the per-stratum regime (one $1\,200$-pair test per geometric stratum, photometric block off, only the stratum's geometric transform applied to the positive view). Stratum abbreviations: $R_{\alpha }$ -- rotation by $\alpha ^\circ $, $\mathrm {HFlip}$ / $\mathrm {VFlip}$ -- horizontal / vertical flip, $T_{0.2}$ -- random translation up to $\pm 20\%$ on each axis. Best $\mathrm {FPR}$ in bold}{table.caption.7}{}}
+\@writefile{toc}{\contentsline {paragraph}{Discussion.}{7}{section*.9}\protected@file@percent }
 \bibstyle{unsrtnat}
 \bibdata{references}
 \bibcite{dosovitskiy2021image}{{1}{2021}{{Dosovitskiy et~al.}}{{Dosovitskiy, Beyer, Kolesnikov, Weissenborn, Zhai, Unterthiner, Dehghani, Minderer, Heigold, Gelly, Uszkoreit, and Houlsby}}}
@@ -71,14 +82,16 @@
 \bibcite{bronstein2021geometric}{{3}{2021}{{Bronstein et~al.}}{{Bronstein, Bruna, Cohen, and Veli{\v {c}}kovi{\'c}}}}
 \bibcite{cohen2016group}{{4}{2016}{{Cohen and Welling}}{{}}}
 \bibcite{weiler2019general}{{5}{2019}{{Weiler and Cesa}}{{}}}
-\bibcite{nordstrom2025octic}{{6}{2025}{{Nordstr{\"o}m et~al.}}{{Nordstr{\"o}m, Edstedt, Kahl, and B{\"o}kman}}}
-\bibcite{karella2024harmformer}{{7}{2024}{{Karella et~al.}}{{Karella, Harmanec, Kotera, Bla{\v {z}}ek, and {\v {S}}roubek}}}
-\bibcite{bromley1993signature}{{8}{1993}{{Bromley et~al.}}{{Bromley, Guyon, LeCun, S{\"a}ckinger, and Shah}}}
-\bibcite{dorin2024pairwise}{{9}{2024}{{Dorin et~al.}}{{Dorin, Varlamova, and Grabovoy}}}
-\bibcite{ke2004efficient}{{10}{2004}{{Ke et~al.}}{{Ke, Sukthankar, and Huston}}}
-\bibcite{hadsell2006dimensionality}{{11}{2006}{{Hadsell et~al.}}{{Hadsell, Chopra, and LeCun}}}
-\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{7}{section.7}\protected@file@percent }
-\newlabel{sec:concl}{{7}{7}{Conclusion}{section.7}{}}
-\bibcite{chopra2005learning}{{12}{2005}{{Chopra et~al.}}{{Chopra, Hadsell, and LeCun}}}
-\bibcite{peng2019domainnet}{{13}{2019}{{Peng et~al.}}{{Peng, Bai, Xia, Huang, Saenko, and Wang}}}
-\gdef \@abspage@last{8}
+\bibcite{bromley1993signature}{{6}{1993}{{Bromley et~al.}}{{Bromley, Guyon, LeCun, S{\"a}ckinger, and Shah}}}
+\bibcite{ke2004efficient}{{7}{2004}{{Ke et~al.}}{{Ke, Sukthankar, and Huston}}}
+\bibcite{pizzi2022sscd}{{8}{2022}{{Pizzi et~al.}}{{Pizzi, Roy, Ravindra, Goyal, and Douze}}}
+\bibcite{kim2025rdcd}{{9}{2025}{{Kim et~al.}}{{Kim, Lee, Park, and Yoon}}}
+\bibcite{nordstrom2025octic}{{10}{2025}{{Nordstr{\"o}m et~al.}}{{Nordstr{\"o}m, Edstedt, Kahl, and B{\"o}kman}}}
+\bibcite{karella2024harmformer}{{11}{2024}{{Karella et~al.}}{{Karella, Harmanec, Kotera, Bla{\v {z}}ek, and {\v {S}}roubek}}}
+\bibcite{peng2019domainnet}{{12}{2019}{{Peng et~al.}}{{Peng, Bai, Xia, Huang, Saenko, and Wang}}}
+\bibcite{dorin2024pairwise}{{13}{2024}{{Dorin et~al.}}{{Dorin, Varlamova, and Grabovoy}}}
+\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{8}{section.7}\protected@file@percent }
+\newlabel{sec:concl}{{7}{8}{Conclusion}{section.7}{}}
+\bibcite{hadsell2006dimensionality}{{14}{2006}{{Hadsell et~al.}}{{Hadsell, Chopra, and LeCun}}}
+\bibcite{chopra2005learning}{{15}{2005}{{Chopra et~al.}}{{Chopra, Hadsell, and LeCun}}}
+\gdef \@abspage@last{9}

@@ -1,16 +1,24 @@
 # Custom — local tooling, IDE, agent skills (not committed)
 .DS_Store
 .agents/
-.agents/skills/find-skills/
 .claude/
-.cursor/skills/
+.cursor/
 .vscode/
 thesis/
 docs/
-docs/superpowers/plans/
 skills-lock.json
 .orchestra-skills.json
 CLAUDE.md
+
+# Local-only review notebooks and rendered HTML
+review_*.html
+review_*.ipynb
+
+# code/ — only the three artefacts referenced from the paper are tracked
+code/*
+!code/experiments.ipynb
+!code/eval_domainnet.ipynb
+!code/harmformer_encoder.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
