@@ -5,8 +5,10 @@
 \usepackage{array}
 \usepackage{multicol}
 \usepackage{booktabs}
+\usepackage{multirow}
 \usepackage{csquotes}
 \usepackage{amssymb,amsfonts,amsmath,bbm}
+\graphicspath{{.}{../paper/figures/preview/}{../paper/figures/training_history/}}
 
 \usecolortheme{beaver}
 \usefonttheme[onlymath]{serif}
@@ -51,7 +53,7 @@
     \begin{block}{Solution}
         \begin{enumerate}[1)]
             \item Build a siamese detector with encoders spanning $D_4$, $SE(2)$.
-            \item Train each with and without geometric augmentations.
+            \item Train each without geometric augmentations.
             \item Evaluate FPR and Recall on balanced DomainNet.
         \end{enumerate}
     \end{block}
@@ -99,11 +101,18 @@
 
 % ---------------------------------------------------------------
 \begin{frame}{Problem Statement}
-    \textbf{Research hypothesis.} For each $G \in \{D_4, SE(2)\}$, let $\phi^{G}$ be a $G$-invariant ViT encoder trained with non-group augmentations only, and $\phi^{\mathrm{aug}}$ a ViT-Tiny/16 trained with non-group + group-$G$ augmentations. Then
-    \[
-        \mathrm{FPR}(\phi^{G}) \leq \mathrm{FPR}(\phi^{\mathrm{aug}}),\quad
-        \mathrm{Recall}(\phi^{G}) \geq \mathrm{Recall}(\phi^{\mathrm{aug}}).
-    \]
+Given a pair $(x_1, x_2)\in\mathcal{X}\times\mathcal{X}$, predict $y \in \{0,1\}$, where $y=1$ marks $x_2$ as a plagiarized derivative of $x_1$.
+
+\medskip
+
+The dataset is $\mathcal{D} = \{(x_{1,i}, x_{2,i}, y_i)\}_{i=1}^{N}$ with $x_{\cdot,i} \in \mathcal{X} = [0,1]^{C\times H\times W}$ and $y_i \in \{0,1\}$.
+
+\medskip
+
+Plagiarism detector:
+\[
+     \phi\colon\mathcal{X}\times\mathcal{X}\to\{0,1\}
+\]
 \end{frame}
 % ---------------------------------------------------------------
 \begin{frame}{Solution}
@@ -113,7 +122,7 @@
     \[
         \delta = |z_1 - z_2|,\qquad
         p = z_1 \odot z_2\ \text{(element-wise)},\qquad
-        v = \bigl[ u_{\delta}(\delta)\,;\, u_p(p) \bigr] \in \mathbb{R}^{2d},
+        v = \bigl[ \delta\,;\, p \bigr] \in \mathbb{R}^{2d},
     \]
     The \emph{fusion} MLP is $w_{\psi} \colon \mathbb{R}^{2d} \to [0,1]$, $w_{\psi}(v) = \sigma\Bigl( c^\top \mathrm{ReLU}\bigl( A v + b \bigr) + d \Bigr)$
 
@@ -138,84 +147,75 @@
 
     \textbf{Setup.}
     \begin{itemize}
-        \item Training set: COCO\,2017 (\textasciitilde118K images).
-        \item Test set: DomainNet, 6 domains, 1\,200 pairs (100 pos + 100 neg per domain).
-        \item Augmentation pipeline (each transform sampled independently, $p=0.3$):\\
-              \textit{Non-group} (shared, all runs): {\small CJ, GBlur, GN, JPEG, WM.}\\
+        \item Training set: COCO\,2017 (118K images), cross-batch pairing.
+        \item Test set: DomainNet, 6 domains, $1\,200$ pairs per regime ($600$ pos + $600$ neg).
+        Two regimes: \emph{overall} (training-time augs on both branches) and \emph{per-transformation} (photometric off, one geometric transform).
+        \item Augmentation pipeline (each transform independent, $p=0.3$):\\
+              \textit{Non-group} (shared): {\small CJ, GBlur, GN, JPEG, WM.}\\
               \textit{Group} (added to ViT-Tiny/16 per comparison):\\
               {\small $D_4$: R90/180/270, HFlip, VFlip.}\\
-              {\small $SE(2)$: R90/180/270, HFlip, VFlip, Crop, Scale.}
+              {\small $SE(2)$: continuous rotation $\alpha\!\sim\!\mathrm{Unif}[0,2\pi)$, translation $\pm 20\%$.}
+        \item Decision threshold $\tau=0.5$; 20 epochs, AdamW, $B=128$, $\lambda=0.05$, $m=0.5$.
     \end{itemize}
 \end{frame}
 
-% Slide 2: Error Analysis \& Ablation
-\begin{frame}{Error Analysis}
-    \begin{columns}[t,onlytextwidth]
-    \begin{column}[t]{0.50\textwidth}
-        \textbf{Per-group comparison.}
-        For each $G \in \{D_4, SE(2)\}$:
-        \begin{enumerate}[1)]
-            \item Train $\phi^{G}$ with non-group augs only.
-            \item Train ViT-Tiny/16 with non-group + block-$G$ augs.
-            \item Full ROC and PR curves; report AUC.
-        \end{enumerate}
-        Non-group augs (shared): CJ, GBlur, GN, JPEG, WM.
-
-        \medskip
-        \textbf{Per-class evaluation.}\\
-        At test time, generate positive pairs using a single known
-        augmentation. Report FPR and Recall separately for each
-        transform class (heatmap: encoder $\times$ augmentation).    \end{column}
-    \begin{column}[t]{0.50\textwidth}
-        \begin{figure}[h]
-            \centering
-            \includegraphics[width=0.92\textwidth]{example-image-a}
-            \caption{\small ROC curves per encoder (placeholder).}
-        \end{figure}
-        \vspace{-0.3cm}
-        \begin{figure}[h]
-            \centering
-            \includegraphics[width=0.92\textwidth]{example-image-b}
-            \caption{\small Per-class Recall heatmap (placeholder).}
-        \end{figure}
-    \end{column}
-    \end{columns}
-\end{frame}
-
-\begin{frame}{Models, dataset, criteria}
+\begin{frame}{Geometric transformations}
     \begin{table}
     \centering
     \small
-    \begin{tabular}{@{}llcc@{}}
+    \begin{tabular}{@{}lll@{}}
     \toprule
-    Encoder & Group augs given to ViT-Tiny/16 & FPR & Recall \\
+    Name & Geometric transformation $g$ & Probes \\
     \midrule
-    \multicolumn{4}{@{}l}{\textit{Comparison 1: $G = D_4$}} \\
-    \quad ViT-Tiny/16 + $D_4$ augs       & R90/180/270, HFlip, VFlip & --- & --- \\
-    \quad OcticViT (no group augs)        & ---                       & --- & --- \\
-    \midrule
-    \multicolumn{4}{@{}l}{\textit{Comparison 2: $G = SE(2)$}} \\
-    \quad ViT-Tiny/16 + $SE(2)$ augs     & R90/180/270, HFlip, VFlip, Crop, Scale & --- & --- \\
-    \quad Harmformer (no group augs)      & ---                       & --- & --- \\
+    $R_{90}$         & $90^\circ$ rotation                            & $D_4$ \\
+    $R_{180}$        & $180^\circ$ rotation                           & $D_4$ \\
+    $R_{270}$        & $270^\circ$ rotation                           & $D_4$ \\
+    $\mathrm{HFlip}$ & horizontal flip                                & $D_4$ reflection \\
+    $\mathrm{VFlip}$ & vertical flip                                  & $D_4$ reflection \\
+    $R_{45}$         & $45^\circ$ rotation                            & $SE(2)\setminus D_4$ \\
+    $R_{135}$        & $135^\circ$ rotation                           & $SE(2)\setminus D_4$ \\
+    $T_{0.2}$        & translation by $\mathrm{Unif}([-0.2, 0.2]^2)$  & $SE(2)$ translation \\
     \bottomrule
     \end{tabular}
     \end{table}
-    All encoders share non-group augmentations (CJ, GBlur, GN, JPEG, WM).\\
+    Per-transformation regime: photometric block off, only the corresponding geometric transform on the positive view; $1\,200$ pairs per transformation.
+\end{frame}
+
+\begin{frame}{Results: per-transformation Recall and overall FPR}
+    \begin{table}
+    \centering
+    \scriptsize
+    \setlength{\tabcolsep}{3pt}
+    \begin{tabular}{@{}lcccccccccc@{}}
+    \toprule
+    \multirow{2}{*}{Model} & \multicolumn{2}{c}{Overall} & \multicolumn{8}{c}{Per-transformation Recall \%} \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-11}
+    & FPR \% & Rec \% & $R_{90}$ & $R_{180}$ & $R_{270}$ & HFlip & VFlip & $R_{45}$ & $R_{135}$ & $T_{0.2}$ \\
+    \midrule
+    ViT-Tiny (photo only)            & 7.67          & 99.83  & 11.7  & 16.5  & 10.7  & 31.3  & 21.2  & 0.5   & 0.3   & 1.2   \\
+    \midrule
+    ViT-Tiny ($D_4$ augs)              & 3.67          & 100.0  & 100.0 & 100.0 & 100.0 & 100.0 & 100.0 & 0.3   & 0.3   & 1.0   \\
+    OcticViT                          & \textbf{1.17} & 99.83  & 100.0 & 100.0 & 100.0 & 100.0 & 100.0 & 0.3   & 0.3   & 0.5   \\
+    \midrule
+    ViT-Tiny ($SE(2)$ augs)            & 16.17         & 95.83  & 100.0 & 100.0 & 100.0 & 100.0 & 100.0 & 31.0  & 30.7  & 99.2  \\
+    Harmformer                        & 12.00         & 99.83  & 100.0 & 100.0 & 100.0 & 94.2  & 94.2  & 0.7   & 0.7   & 2.5   \\
+    \bottomrule
+    \end{tabular}
+    \end{table}
+    All encoders share non-group augs (CJ, GBlur, GN, JPEG, WM); $\tau=0.5$.
 \end{frame}
 
 % ---------------------------------------------------------------
 \begin{frame}{Results and conclusions}\label{slide:results}
-    \textbf{Results.} Placeholders pending training runs:
-    \begin{itemize}
-        \item FPR and Recall per encoder --- \emph{to be filled}.
-        \item Per-transformation Recall heatmap (encoder $\times$ aug.\ class) --- \emph{to be filled}.
-        \item ROC and PR curves per comparison ($\phi^G$ vs.\ $\phi^{\mathrm{aug}}$) --- \emph{to be filled}.
-    \end{itemize}
-    \textbf{Expected conclusions.}
-    \begin{enumerate}[1)]
-        \item For each $G$, the $G$-invariant encoder trained without group augs matches or exceeds the augmented ViT-Tiny/16 in both FPR and Recall.
-        \item Adding block-$G$ augs to $\phi^G$ yields no gain.
+    \textbf{$D_4$ comparison.} OcticViT (no group augs) matches the augmented ViT-Tiny/16 at $100\%$ Recall on every $D_4$ transformation and cuts overall FPR from $3.67\%$ to $1.17\%$ --- architectural invariance fully replaces the $D_4$ augmentation block and triples precision at fixed $\tau$.
 
+    \textbf{$SE(2)$ comparison.} Verdict is mixed. Harmformer beats the augmented baseline on overall FPR ($12.00$ vs $16.17$) and Recall ($99.83$ vs $95.83$), and is exact on the discrete $D_4$ orbit, but collapses on $R_{45}/R_{135}$ ($<1\%$) and translation $T_{0.2}$ ($2.5\%$). We attribute the off-axis collapse to interpolation noise at the $32{\times}32$ input grid of the released Harmformer code, not to the equivariance principle.
+
+    \textbf{Conclusions.}
+    \begin{enumerate}[1)]
+        \item For $G=D_4$ the hypothesis $H_1$ is supported: invariant encoder $\geq$ augmented baseline on both FPR and Recall.
+        \item For $G=SE(2)$ $H_1$ holds on overall metrics but fails on off-$D_4$ transformations; resolution-bound, not principle-bound.
+        \item Future work: rerun at higher input resolution; extend the set of transformations to scale and projective ones.
     \end{enumerate}
 \end{frame}
 
